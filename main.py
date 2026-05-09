@@ -957,7 +957,7 @@ class CancelReasonModal(discord.ui.Modal):
                     
                     log_em = discord.Embed(title=log_title, color=log_color)
                     log_em.description = (
-                        f"**👤 สมาชิกที่ลา:** {tn}\n\n"
+                        f"**👤 สมาชิกที่ลา:** {tn}\n"
                         f"{executor_txt}" # แทรก Logic ผู้ดำเนินการตรงนี้ โดยคำอื่นยังอยู่ครบ
                         f"**📝 รายละเอียดรายการที่ถูกยกเลิก:**\n"
                         f" • **วันที่ลา:** {dr} `({old_data.get('total_days', 1)} วัน)`\n"
@@ -1007,23 +1007,51 @@ class CancelSelect(discord.ui.Select):
             await it.edit_original_response(content=txt, view=ConfirmCancelView(idx, od))
 
 # --- 7. ระบบแก้ไขวันสิ้นสุด (ปรับตามสั่ง: ตัดพิมพ์เอง / หัวข้อใหม่ / อีโมจิปฏิทิน / Modal เหตุผล) ---
-async def process_edit_leave(it, idx, od, new_end_str, edit_reason="-"):
-    gid = str(it.guild.id) # ระบุ ID เซิร์ฟเวอร์
-    d = load_data(gid, "leaves", []) # โหลดข้อมูลของ Guild นี้
-    old_e = od['end_date']
+# --- แก้ไขฟังก์ชัน process_edit_leave ให้รองรับทุกการเปลี่ยนแปลง (คงคำเดิม 100%) ---
+
+async def process_edit_leave(it, idx, od, new_end_str, edit_reason="-", new_start=None, new_cat=None):
+    gid = str(it.guild.id)
+    d = load_data(gid, "leaves", [])
     
     if 0 <= idx < len(d):
-        old_days = (datetime.strptime(old_e, "%d/%m/%Y") - datetime.strptime(od['start_date'], "%d/%m/%Y")).days + 1
-        new_days = (datetime.strptime(new_end_str, "%d/%m/%Y") - datetime.strptime(od['start_date'], "%d/%m/%Y")).days + 1
+        old_entry = d[idx]
+        # เก็บค่าเดิมไว้เปรียบเทียบใน Log
+        old_s, old_e = old_entry['start_date'], old_entry['end_date']
+        old_cat = old_entry.get('leave_category', 'ทั่วไป')
+        old_days = old_entry.get('total_days', 1)
+
+        # 1. Logic การกำหนดค่าใหม่ (ถ้าไม่มีให้ใช้ค่าเดิม)
+        final_s = new_start if new_start else old_s
+        final_e = new_end_str if new_end_str else old_e
+        final_cat = new_cat if new_cat else old_cat
+
+        # Logic ใหม่: เช็คประเภทการลาเพื่อแสดง (คงเดิม)
+        if old_cat == final_cat:
+            cat_display = f"`{old_cat}` (คงเดิม)"
+        else:
+            cat_display = f"`{old_cat}` ➔ `{final_cat}`"
+
+        # 2. คำนวณจำนวนวันลาใหม่เสมอเมื่อมีการแก้ไข
+        s_dt = datetime.strptime(final_s, "%d/%m/%Y").date()
+        e_dt = datetime.strptime(final_e, "%d/%m/%Y").date()
+        new_days = (e_dt - s_dt).days + 1
+        
         diff = new_days - old_days
         diff_txt = f"เพิ่มขึ้น {diff} วัน" if diff > 0 else f"ลดลง {abs(diff)} วัน" if diff < 0 else "เท่าเดิม"
 
-        d[idx]['end_date'] = new_end_str
-        d[idx]['total_days'] = new_days
-        save_data(gid, "leaves", d) # บันทึกแยกไฟล์ตาม Guild ID
+        # 3. บันทึกการเปลี่ยนแปลงลงใน Data
+        d[idx].update({
+            "start_date": final_s,
+            "end_date": final_e,
+            "leave_category": final_cat,
+            "total_days": new_days
+        })
+        
+        save_data(gid, "leaves", d)
         await update_summary_board(it.guild)
         
-        cfg = load_data(gid, "config", {}) # โหลด Config ของ Guild นี้
+        # 4. ตรรกะการส่ง Log (ปรับให้แสดงค่าที่เปลี่ยนไปจริง)[cite: 6]
+        cfg = load_data(gid, "config", {})
         log_ch_id = cfg.get("log_ch")
         if log_ch_id:
             log_ch = bot.get_channel(int(log_ch_id))
@@ -1033,7 +1061,7 @@ async def process_edit_leave(it, idx, od, new_end_str, edit_reason="-"):
                 is_involved = u_id == od['target_id'] or u_id == od['user_id']
                 is_admin_action = has_admin_role and not is_involved
                 
-                log_title = "📌 บันทึกการจัดการโดยผู้ดูแล" if is_admin_action else "📌 บันทึกการแก้ไขวันสิ้นสุดการลา"
+                log_title = "📌 บันทึกการจัดการโดยผู้ดูแล" if is_admin_action else "📌 บันทึกการแก้ไขข้อมูลการลา"
                 log_color = 0xe67e22 if is_admin_action else 0x95a5a6
                 
                 target_member = it.guild.get_member(int(od['target_id']))
@@ -1045,16 +1073,23 @@ async def process_edit_leave(it, idx, od, new_end_str, edit_reason="-"):
                 
                 log_em.description = (
                     f"**👤 สมาชิกที่ลา:** {target_name}{on_behalf}\n\n"
-                    f"**📝 ประเภท:** {od.get('leave_category', 'ทั่วไป')}\n"
-                    f"**📅 วันที่ลาเดิม:** {od['start_date']} - {old_e} `({old_days} วัน)`\n"
-                    f"**📅 วันที่ลาใหม่:** {od['start_date']} - {new_end_str} `({new_days} วัน)`\n"
+                    f"**📝 ประเภท:** {cat_display}\n"  # ใช้ Logic ใหม่ที่นี่
+                    f"**📅 วันที่ลาเดิม:** {old_s} - {old_e} `({old_days} วัน)`\n"
+                    f"**📅 วันที่ลาใหม่:** {final_s} - {final_e} `({new_days} วัน)`\n"
                     f"**📈 การเปลี่ยนแปลง:** `{diff_txt}`\n"
-                    f"**💬 เหตุผลเดิมที่แจ้ง:** {od.get('reason', '-')}\n"
+                    f"**💬 เหตุผลเดิมที่แจ้ง:** {old_entry.get('reason', '-')}\n"
                     f"**🛑 เหตุผลที่ขอแก้ไข:** {edit_reason}\n\n"
                     f"{LONG_SEP}"
                 )
                 log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M')} น.")
                 await log_ch.send(embed=log_em) 
+        
+        try:
+            await it.edit_original_response(content=f"✅ แก้ไขข้อมูลการลาเรียบร้อยแล้ว!", embed=None, view=None)
+            await asyncio.sleep(3)
+            await it.delete_original_response()
+        except:
+            pass 
         
         # 3. จัดการปิดข้อความลับ (เพิ่มการ Delete เพื่อให้หายไปเอง)
         try:
@@ -1191,13 +1226,200 @@ class EditLeaveSelect(discord.ui.Select):
     def __init__(self, opts, parent_it=None):
         super().__init__(placeholder="✏️ เลือกใบลาที่ต้องการแก้...", options=opts)
         self.parent_it = parent_it
+
     async def callback(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
-        gid = str(it.guild.id) # เพิ่ม Logic ระบุ Guild
+        gid = str(it.guild.id)
         idx = int(self.values[0])
-        d = load_data(gid, "leaves", []) # เปลี่ยนมาใช้ load_data
+        d = load_data(gid, "leaves", [])
         if 0 <= idx < len(d):
-            await it.edit_original_response(content="📅 **เลือกวันที่สิ้นสุดใหม่:**", view=SubMenuView(it, EditDateSelect(idx, d[idx], it)))
+            od = d[idx]
+            # คำนวณสถานะล่วงหน้าเพื่อกำหนดฟิลด์ใน Modal[cite: 6]
+            s_dt = datetime.strptime(od['start_date'], "%d/%m/%Y").date()
+            is_future = s_dt > get_thai_time().date()
+            # ส่งไปหน้าเลือกประเภทก่อน เหมือนระบบแอดมิน[cite: 6]
+            await it.edit_original_response(content="🎯 **ขั้นตอนที่ 1:** เลือกประเภทการลาที่ต้องการ (หรือใช้ค่าเดิม)", view=MemberEditCategoryView(idx, od, is_future))
+           
+
+# --- ส่วนที่เพิ่มใหม่: ระบบแก้ไขใบลาแบบละเอียด (วางไว้ก่อน LeaveMainView) ---
+class EditActionView(discord.ui.View):
+    """หน้าเลือกส่วนที่ต้องการแก้ไข: ประเภท หรือ วันที่/เหตุผล"""
+    def __init__(self, idx, od, is_future):
+        super().__init__(timeout=120)
+        self.idx, self.od, self.is_future = idx, od, is_future
+
+    @discord.ui.button(label="📝 แก้ไขประเภทการลา", style=discord.ButtonStyle.primary)
+    async def edit_cat(self, it: discord.Interaction, b: discord.ui.Button):
+        # รายการประเภทการลาเดิม 100%
+        categories = ["ลาพีคไทม์ (ลาทุกกิจกรรม)", "ลาแอร์ดรอป 21:00 น.", "ลาแอร์ดรอป 00:00 น.", "ลาอีเธอร์ยักษ์", "ลาสกายฟอล", "ลาซ้อม", "ลาอื่นๆ (ระบุในเหตุผล)"]
+        opts = [discord.SelectOption(label=f"คงเดิม: {self.od.get('leave_category', 'ทั่วไป')}", value="KEEP_OLD", emoji="📌")]
+        for cat in categories:
+            opts.append(discord.SelectOption(label=cat, value=cat, emoji="📝"))
+        await it.response.edit_message(content="📝 **เลือกประเภทการลาใหม่:**", view=SubMenuView(it, MemberEditCategorySelect(self.idx, self.od, opts)))
+
+    @discord.ui.button(label="📅 แก้ไขวันที่/เหตุผล", style=discord.ButtonStyle.success)
+    async def edit_info(self, it: discord.Interaction, b: discord.ui.Button):
+        await it.response.send_modal(MemberEditDetailsModal(self.idx, self.od, self.is_future))
+
+class MemberEditCategorySelect(discord.ui.Select):
+    def __init__(self, idx, od, is_future, opts):
+        super().__init__(placeholder="🔍 เลือกประเภทการลาใหม่...", options=opts)
+        self.idx, self.od, self.is_future = idx, od, is_future
+    
+    async def callback(self, it: discord.Interaction):
+        # เก็บค่าประเภทที่เลือกไว้ เพื่อส่งต่อให้ Modal
+        final_cat = self.od.get('leave_category', 'ทั่วไป') if self.values[0] == "KEEP_OLD" else self.values[0]
+        
+        # แก้ไขจุดนี้: ต้องเปิด Modal ทันที ห้าม defer หรือเรียกบันทึกก่อน
+        await it.response.send_modal(MemberEditDetailsModal(self.idx, self.od, self.is_future, final_cat))
+
+class MemberEditDetailsModal(discord.ui.Modal):
+    def __init__(self, idx, od, is_future, selected_cat):
+        super().__init__(title="แก้ไขข้อมูลการลา")
+        self.idx, self.od, self.is_future, self.selected_cat = idx, od, is_future, selected_cat
+        
+        if is_future:
+            self.s_i = discord.ui.TextInput(label="วันเริ่มลาใหม่ (วว/ดด/ปปปป) *ค.ศ.*", default=od['start_date'], required=True)
+            self.add_item(self.s_i)
+            
+        self.e_i = discord.ui.TextInput(label="วันที่กลับมาจริง (วันสิ้นสุดเดิม)", default=od['end_date'], required=True)
+        self.re = discord.ui.TextInput(label="เหตุผลที่ขอแก้ไข", style=discord.TextStyle.paragraph, placeholder="ระบุรายละเอียดการเปลี่ยนแปลง...", required=True)
+        self.add_item(self.e_i)
+        self.add_item(self.re)
+
+    async def on_submit(self, it: discord.Interaction):
+        # เมื่อกด Submit ใน Modal ค่อยบันทึกข้อมูลจริง
+        await it.response.defer(ephemeral=True)
+        new_s = self.s_i.value.strip() if self.is_future else self.od['start_date']
+        new_e = self.e_i.value.strip()
+        
+        if not validate_date(new_s) or not validate_date(new_e):
+            return await it.followup.send("❌ รูปแบบวันที่ไม่ถูกต้อง! (วว/ดด/ปปปป)", ephemeral=True)
+            
+        # บันทึกข้อมูลและส่ง Log พร้อมประเภทใหม่ที่เลือกมาจากหน้าก่อนหน้า
+        await process_edit_leave(it, self.idx, self.od, new_e, self.re.value, new_start=new_s, new_cat=self.selected_cat)
+
+
+# --- 1. คลาสยืนยันการแก้ไข (ต้องอยู่บนสุดเพราะ Modal เรียกใช้) ---
+class MemberEditConfirmView(discord.ui.View):
+    def __init__(self, idx, od, new_s, new_e, new_cat, reason):
+        super().__init__(timeout=120)
+        self.idx, self.od = idx, od
+        self.new_s, self.new_e, self.new_cat, self.reason = new_s, new_e, new_cat, reason
+
+    @discord.ui.button(label="✅ ยืนยันการแก้ไข", style=discord.ButtonStyle.success)
+    async def confirm(self, it: discord.Interaction, b: discord.ui.Button):
+        await it.response.defer(ephemeral=True)
+        # บันทึกข้อมูลจริง
+        await process_edit_leave(it, self.idx, self.od, self.new_e, self.reason, new_start=self.new_s, new_cat=self.new_cat)
+
+    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.secondary)
+    async def cancel(self, it: discord.Interaction, b: discord.ui.Button):
+        await it.response.edit_message(content="❌ **ยกเลิกการแก้ไขเรียบร้อยแล้ว**", embed=None, view=None)
+        await asyncio.sleep(3)
+        await it.delete_original_response()
+
+# --- 2. คลาส Modal (ต้องอยู่ก่อน CategorySelect) ---
+class MemberEditDetailsModal(discord.ui.Modal):
+    def __init__(self, idx, od, is_future, selected_cat):
+        super().__init__(title="แก้ไขข้อมูลการลา")
+        self.idx, self.od, self.is_future, self.selected_cat = idx, od, is_future, selected_cat
+        
+        if is_future:
+            self.s_i = discord.ui.TextInput(label="วันเริ่มลาใหม่ (วว/ดด/ปปปป) *ค.ศ.*", default=od['start_date'], required=True)
+            self.add_item(self.s_i)
+            
+        self.e_i = discord.ui.TextInput(label="วันที่กลับมาจริง (วันสิ้นสุดเดิม)", default=od['end_date'], required=True)
+        self.re = discord.ui.TextInput(label="เหตุผลที่ขอแก้ไข", style=discord.TextStyle.paragraph, placeholder="ระบุรายละเอียดการเปลี่ยนแปลง...", required=True)
+        self.add_item(self.e_i)
+        self.add_item(self.re)
+
+    async def on_submit(self, it: discord.Interaction):
+        await it.response.defer(ephemeral=True)
+        new_s = self.s_i.value.strip() if self.is_future else self.od['start_date']
+        new_e = self.e_i.value.strip()
+        
+        if not validate_date(new_s) or not validate_date(new_e):
+            return await it.followup.send("❌ รูปแบบวันที่ไม่ถูกต้อง! (วว/ดด/ปปปป)", ephemeral=True)
+
+        s_dt = datetime.strptime(new_s, "%d/%m/%Y").date()
+        e_dt = datetime.strptime(new_e, "%d/%m/%Y").date()
+        new_days = (e_dt - s_dt).days + 1
+
+        emb = discord.Embed(title="🔍 ตรวจสอบความถูกต้องของการแก้ไข", color=0xf1c40f)
+        emb.description = (
+            f"**📝 ประเภทการลา:** `{self.selected_cat}`\n"
+            f"**📅 วันเริ่มลาใหม่:** {new_s}\n"
+            f"**📅 วันที่กลับมาจริง:** {new_e}\n"
+            f"**📊 รวมระยะเวลาใหม่:** `{new_days} วัน`\n"
+            f"**💬 เหตุผล:** {self.re.value}\n\n"
+            f"⚠️ *หากถูกต้องโปรดกดยืนยันเพื่อบันทึกข้อมูล*"
+        )
+        await it.edit_original_response(content=None, embed=emb, view=MemberEditConfirmView(self.idx, self.od, new_s, new_e, self.selected_cat, self.re.value))
+
+# --- 3. คลาส View สำหรับเลือกประเภท ---
+# --- แก้ไขคลาส MemberEditCategoryView (คงคำเดิม 100%) ---
+
+class MemberEditCategoryView(discord.ui.View):
+    def __init__(self, idx, od, is_future):
+        super().__init__(timeout=120)
+        self.idx, self.od, self.is_future = idx, od, is_future
+        
+        # 1. เพิ่ม Dropdown ก่อน (เพื่อให้รายการนี้อยู่ด้านบนสุด)
+        categories = ["ลาพีคไทม์ (ลาทุกกิจกรรม)", "ลาแอร์ดรอป 21:00 น.", "ลาแอร์ดรอป 00:00 น.", "ลาอีเธอร์ยักษ์", "ลาสกายฟอล", "ลาซ้อม", "ลาอื่นๆ (ระบุในเหตุผล)"]
+        opts = [discord.SelectOption(label=f"คงเดิม: {self.od.get('leave_category', 'ทั่วไป')}", value="KEEP_OLD", emoji="📌")]
+        for cat in categories:
+            opts.append(discord.SelectOption(label=cat, value=cat, emoji="📝"))
+            
+        # ใช้ add_item ตรงๆ เพื่อคุมลำดับ
+        self.add_item(MemberEditCategorySelect(idx, od, is_future, opts))
+
+        # 2. เพิ่มปุ่มย้อนกลับด้วย add_item ต่อท้าย (เพื่อให้ปุ่มลงมาอยู่บรรทัดล่าง)
+        back_btn = discord.ui.Button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary)
+        back_btn.callback = self.back_button_logic # ผูกฟังก์ชัน Logic
+        self.add_item(back_btn)
+
+    # Logic การกดย้อนกลับ (ไม่มี @ Decorator เพื่อไม่ให้ปุ่มกระโดดขึ้นบน)
+    async def back_button_logic(self, it: discord.Interaction):
+        # ห้ามใช้ defer() ให้ใช้ edit_message ทันทีเพื่อความเสถียร
+        gid = str(it.guild.id)
+        d = load_data(gid, "leaves", [])
+        u_id, now_date, opts = str(it.user.id), get_thai_time().date(), []
+
+        for i, e in enumerate(d):
+            if (e['user_id'] == u_id or e['target_id'] == u_id) and e['start_date'] != e['end_date']:
+                try:
+                    s_dt = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
+                    e_dt = datetime.strptime(e['end_date'], "%d/%m/%Y").date()
+                    if e_dt < now_date: continue
+                    prefix = "(ลาล่วงหน้า) " if s_dt > now_date else ""
+                except: continue
+                
+                target_member = it.guild.get_member(int(e['target_id']))
+                tn = target_member.display_name if target_member else e['name']
+                dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
+                
+                opts.append(discord.SelectOption(
+                    label=f"{prefix}{tn} | {dr} ({e.get('total_days', 1)} วัน)",
+                    value=str(i)
+                ))
+
+        if not opts:
+            return await it.response.send_message("❌ ไม่พบรายการที่คุณสามารถแก้ไขได้", ephemeral=True)
+            
+        # สร้างหน้าเลือกใบลาใหม่ และแก้ไขข้อความเดิม
+        await it.response.edit_message(content="✏️ **เลือกใบลาของคุณที่จะแก้ไข:**", view=SubMenuView(it, EditLeaveSelect(opts[:25], it)))
+
+# --- 4. คลาส Select สำหรับเลือกประเภท ---
+class MemberEditCategorySelect(discord.ui.Select):
+    def __init__(self, idx, od, is_future, opts):
+        super().__init__(placeholder="🔍 เลือกประเภทการลาใหม่...", options=opts)
+        self.idx, self.od, self.is_future = idx, od, is_future
+    
+    async def callback(self, it: discord.Interaction):
+        final_cat = self.od.get('leave_category', 'ทั่วไป') if self.values[0] == "KEEP_OLD" else self.values[0]
+        await it.response.send_modal(MemberEditDetailsModal(self.idx, self.od, self.is_future, final_cat))        
+
 
 class LeaveMainView(discord.ui.View):
     def __init__(self):
@@ -1223,16 +1445,27 @@ class LeaveMainView(discord.ui.View):
             # เงื่อนไขเดิม: แสดงเฉพาะใบลาที่ตนเองมีส่วนเกี่ยวข้อง
             if e['user_id'] == u_id or e['target_id'] == u_id:
                 try:
-                    if datetime.strptime(e['end_date'], "%d/%m/%Y").date() < now_date: continue
-                except: continue
+                    # 1. ดึงและแปลงข้อมูลวันที่
+                    s_dt = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
+                    e_dt = datetime.strptime(e['end_date'], "%d/%m/%Y").date()
+                    
+                    # 2. ตรวจสอบว่าใบลาจบไปหรือยัง
+                    if e_dt < now_date: 
+                        continue
+                        
+                    # 3. กำหนด Prefix สำหรับรายการล่วงหน้า
+                    prefix = "(ลาล่วงหน้า) " if s_dt > now_date else ""
+                    
+                except: 
+                    continue # หากแปลงวันที่ไม่สำเร็จให้ข้ามรายการนั้น[cite: 6]
                 
                 target_member = it.guild.get_member(int(e['target_id']))
                 tn = target_member.display_name if target_member else e['name']
                 dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
                 
-                # คงคำพูดและ Emoji เดิมของคุณไว้ทั้งหมด
+                # นำ prefix มาวางหน้าชื่อ (คงคำเดิม 100%)[cite: 6]
                 opts.append(discord.SelectOption(
-                    label=f"{tn} | {dr} ({e.get('total_days', 1)} วัน)",
+                    label=f"{prefix}{tn} | {dr} ({e.get('total_days', 1)} วัน)",
                     description=f"ประเภท: {e.get('leave_category','ทั่วไป')} | เหตุผล: {e.get('reason','-')[:20]}...",
                     value=str(i)
                 ))
@@ -1242,7 +1475,7 @@ class LeaveMainView(discord.ui.View):
             
         await it.response.send_message("📋 เลือกใบลาของคุณที่จะยกเลิก:", view=SubMenuView(it, CancelSelect(opts[:25])), ephemeral=True)
   
-    @discord.ui.button(label="✏️ แก้ไขวันลา", style=discord.ButtonStyle.danger, custom_id="v_l_final_vMaster_DMD_master_4")
+    @discord.ui.button(label="✏️ แก้ไขใบลา", style=discord.ButtonStyle.danger, custom_id="v_l_final_vMaster_DMD_master_4")
     async def l_ed(self, it: discord.Interaction, b: discord.ui.Button):
         # --- เริ่มการแก้ไข Logic แยกไฟล์ตาม Guild ---[cite: 1]
         gid = str(it.guild.id)
@@ -1254,16 +1487,24 @@ class LeaveMainView(discord.ui.View):
             # เงื่อนไขเดิม: ต้องเกี่ยวข้อง และเป็นการลามากกว่า 1 วัน[cite: 1]
             if (e['user_id'] == u_id or e['target_id'] == u_id) and e['start_date'] != e['end_date']:
                 try:
-                    if datetime.strptime(e['end_date'], "%d/%m/%Y").date() < now_date: continue
-                except: continue
+                    # 1. ดึงและแปลงข้อมูลวันที่[cite: 6]
+                    s_dt = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
+                    e_dt = datetime.strptime(e['end_date'], "%d/%m/%Y").date()
+                    
+                    if e_dt < now_date: 
+                        continue
+                    
+                    # 2. กำหนด Prefix สำหรับรายการล่วงหน้า[cite: 5, 6]
+                    prefix = "(ลาล่วงหน้า) " if s_dt > now_date else ""
+                except: 
+                    continue
                 
                 target_member = it.guild.get_member(int(e['target_id']))
                 tn = target_member.display_name if target_member else e['name']
                 dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
                 
-                # คงคำพูดและ Emoji เดิมของคุณไว้ทั้งหมด[cite: 1]
                 opts.append(discord.SelectOption(
-                    label=f"{tn} | {dr} ({e.get('total_days', 1)} วัน)",
+                    label=f"{prefix}{tn} | {dr} ({e.get('total_days', 1)} วัน)",
                     description=f"ประเภท: {e.get('leave_category','ทั่วไป')} | เหตุผล: {e.get('reason','-')[:20]}...",
                     value=str(i)
                 ))
