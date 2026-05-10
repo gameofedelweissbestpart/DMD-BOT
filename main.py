@@ -813,7 +813,7 @@ async def weekly_report_task():
     n = get_thai_time()
     
     # ส่งรายงานทุกวันจันทร์ เวลา 00:10 น.
-    if n.weekday() == 0 and n.hour == 2 and n.minute == 25:
+    if n.weekday() == 0 and n.hour == 0 and n.minute == 10:
         # แก้ Logic: วนลูปทุก Guild ที่บอทอยู่เพื่อให้แยกไฟล์กันเด็ดขาด
         for guild in bot.guilds:
             gid = str(guild.id)
@@ -1587,37 +1587,6 @@ async def backup(ctx):
         await ctx.send(f"✅ ส่งไฟล์ Backup เข้า DM ของท่าน (@{ctx.author.display_name}) เรียบร้อยแล้ว")
     except discord.Forbidden:
         await ctx.send("❌ **ไม่สามารถส่งไฟล์ได้!** โปรดเปิดการรับข้อความจาก DM (Private Message) ก่อนครับ")
-
-
-#เซ็ตห้องสรุปรายสัปดาห์
-@bot.command(name="setreport")
-@commands.has_permissions(administrator=True)
-async def set_report_channel(ctx, channel: discord.TextChannel):
-    config = load_data(ctx.guild.id, 'config', {})
-    config['report_channel'] = channel.id # บันทึก ID ห้องลงใน config
-    save_data(ctx.guild.id, 'config', config)
-    await ctx.send(f"✅ ตั้งค่าห้องส่งรายงานเป็น {channel.mention} เรียบร้อยแล้ว!")        
-
-
-@bot.command(name="testweekly")
-@commands.is_owner() # ให้เฉพาะเจ้าของบอทใช้ได้เพื่อความปลอดภัย
-async def test_weekly(ctx):
-    await ctx.send("⌛ **กำลังทดสอบรันระบบสรุปรายสัปดาห์...**")
-    try:
-        # ดึง config มาเช็กก่อนว่าตั้ง channel ไว้หรือยัง
-        config = load_data(ctx.guild.id, 'config', {})
-        channel_id = config.get('report_channel')
-        
-        if not channel_id:
-            return await ctx.send(f"❌ **ผิดพลาด:** เซิร์ฟเวอร์นี้ยังไม่ได้ตั้งค่าห้องรับรายงาน (`report_channel` ใน config เป็นค่าว่าง)")
-
-        # เรียกใช้ฟังก์ชันส่งรายงานโดยตรง
-        await send_weekly_summary()
-        await ctx.send("✅ **รันระบบสรุปรายสัปดาห์สำเร็จ!** (โปรดเช็กในห้องรายงานที่ตั้งค่าไว้)")
-        
-    except Exception as e:
-        await ctx.send(f"⚠️ **เกิดข้อผิดพลาดขณะรัน:** `{str(e)}` \n(โปรดเช็ก Log ใน Console เพื่อดูรายละเอียด)")
-
 
 # --- ย้าย on_ready มาไว้ท้ายสุด และใส่ add_view ให้ครบ ---
 @bot.event
