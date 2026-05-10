@@ -813,7 +813,7 @@ async def weekly_report_task():
     n = get_thai_time()
     
     # ส่งรายงานทุกวันจันทร์ เวลา 00:10 น.
-    if n.weekday() == 0 and n.hour == 0 and n.minute == 10:
+    if n.weekday() == 0 and n.hour == 2 and n.minute == 1:
         # แก้ Logic: วนลูปทุก Guild ที่บอทอยู่เพื่อให้แยกไฟล์กันเด็ดขาด
         for guild in bot.guilds:
             gid = str(guild.id)
