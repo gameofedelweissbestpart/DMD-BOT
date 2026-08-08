@@ -736,7 +736,7 @@ async def daily_report_task():
     n = get_thai_time()
     
     # ส่งรายงานเวลา 00:05 น. ของทุกวัน
-    if n.hour == 1 and n.minute == 30:
+    if n.hour == 20 and n.minute == 48:
         # แก้ Logic: วนลูปทุก Guild ที่บอทอยู่เพื่อให้แยกไฟล์กันเด็ดขาด
         for guild in bot.guilds:
             gid = str(guild.id)
