@@ -731,12 +731,13 @@ class AdminEditDetailsModal(discord.ui.Modal):
 
 # --- 5. งานรายวัน (ฉบับแก้ไข Syntax + นับจำนวนคนแบบ Unique) ---
 # --- ฟังก์ชันสรุปรายวัน (คงคำพูดเดิม 100% / แก้ Logic แยกไฟล์ตาม Guild) ---
+# --- 5. งานรายวัน (ฉบับแก้ไขเวลา 00:05 น. สรุปของเมื่อวาน + ป้องกันข้อความยาวเกิน) ---
 @tasks.loop(minutes=1)
 async def daily_report_task():
     n = get_thai_time()
     
     # ส่งรายงานเวลา 00:05 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
-    if n.hour == 21 and n.minute == 33:
+    if n.hour == 0 and n.minute == 5:
         for guild in bot.guilds:
             gid = str(guild.id)
             cfg = load_data(gid, "config", {})
@@ -800,6 +801,17 @@ async def daily_report_task():
                     em.add_field(name="\u200b", value=summary_msg, inline=False)
                     em.set_footer(text=f"ระบบรายงานอัตโนมัติ: {n.strftime('%d/%m/%Y %H:%M น.')}")
                     await ch.send(embed=em)
+
+# เพิ่มตัวช่วยให้ Loop ทำงานเสถียร ไม่ค้าง
+@daily_report_task.before_loop
+async def before_daily_report():
+    await bot.wait_until_ready()
+
+@daily_report_task.error
+async def daily_report_error(error):
+    print(f"เกิดข้อผิดพลาดใน Daily Task: {error}")
+    if not daily_report_task.is_running():
+        daily_report_task.restart()
 
 
     # --- ฟังก์ชันสรุปรายสัปดาห์ (วางต่อจาก daily_report_task หรือก่อน bot.run) ---
