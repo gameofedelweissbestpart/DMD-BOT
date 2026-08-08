@@ -735,25 +735,21 @@ class AdminEditDetailsModal(discord.ui.Modal):
 async def daily_report_task():
     n = get_thai_time()
     
-    # ส่งรายงานเวลา 00:05 น. ของทุกวัน
-    if n.hour == 20 and n.minute == 55:
-        # แก้ Logic: วนลูปทุก Guild ที่บอทอยู่เพื่อให้แยกไฟล์กันเด็ดขาด
+    # ส่งรายงานเวลา 00:05 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
+    if n.hour == 21 and n.minute == 33:
         for guild in bot.guilds:
             gid = str(guild.id)
-            # แก้ Logic: โหลด Config แยกตาม Guild ID
             cfg = load_data(gid, "config", {})
             ch_id = cfg.get("daily_ch", 0)
             
             if ch_id:
                 ch = bot.get_channel(int(ch_id))
                 if ch:
-                    # แก้ Logic: โหลดใบลาแยกตาม Guild ID
                     data = load_data(gid, "leaves", [])
                     target_date = (n - timedelta(days=1)).date()
                     
-                    # ประมวลผลคนลาในวันนั้น (คง Logic เดิมของคุณ)
                     daily_grouped = {}
-                    cat_counts = {} # เพิ่มตัวแปรเก็บสถิติประเภทการลา
+                    cat_counts = {}
 
                     for e in data:
                         try:
@@ -765,13 +761,11 @@ async def daily_report_task():
                                     daily_grouped[tid] = []
                                 daily_grouped[tid].append(e)
                                 
-                                # เก็บสถิติประเภทการลา
                                 cat = e.get('leave_category', 'ทั่วไป')
                                 cat_counts[cat] = cat_counts.get(cat, 0) + 1
                         except:
                             continue
 
-                    # --- ส่วนสร้าง Embed (คงคำพูดและสัญลักษณ์เดิมของคุณทั้งหมด) ---
                     separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
                     em = discord.Embed(
                         title="📋 __รายงานสรุปการลาประจำวัน__",
@@ -792,19 +786,21 @@ async def daily_report_task():
                                 msg += f" \u17b5 \u17b5 \u17b5 └ **เหตุผล:** {leaf['reason']}\n"
                             msg += "\n"
                         
+                        # ป้องกันข้อความยาวเกินขีดจำกัด 1024 อักขระของ Embed Field
+                        if len(msg) > 1024:
+                            msg = msg[:1020] + "..."
+
                         em.add_field(name="\u200b", value=msg, inline=False)
                     
-                    # --- ส่วนสรุปยอดรวมที่นำกลับมาให้ครบตามที่คุณแจ้ง ---
                     summary_msg = f"{separator}\n"
-                    summary_msg += f"📊 **สรุปจำนวนคนลา: {len(daily_grouped)} คน**\n" # ใช้ len(daily_grouped) เพื่อความ Unique ตามเดิม
-                    for cat_name, count in cat_counts.items(): # เติม : ตามเดิม
+                    summary_msg += f"📊 **สรุปจำนวนคนลา: {len(daily_grouped)} คน**\n"
+                    for cat_name, count in cat_counts.items():
                         summary_msg += f"• {cat_name}: `{count}` ครั้ง\n"
                     
                     em.add_field(name="\u200b", value=summary_msg, inline=False)
-
-                    # คงส่วนท้ายของ Embed ให้เหมือนเดิมเป๊ะ
-                    em.set_footer(text=f"ระบบรายงานอัตโนมัติ: {get_thai_time().strftime('%d/%m/%Y %H:%M น.')}")
+                    em.set_footer(text=f"ระบบรายงานอัตโนมัติ: {n.strftime('%d/%m/%Y %H:%M น.')}")
                     await ch.send(embed=em)
+
 
     # --- ฟังก์ชันสรุปรายสัปดาห์ (วางต่อจาก daily_report_task หรือก่อน bot.run) ---
 # --- ฟังก์ชันสรุปรายสัปดาห์ (คงคำพูดเดิม / แก้ Logic แยกไฟล์ตาม Guild) ---
