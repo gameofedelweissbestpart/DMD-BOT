@@ -731,13 +731,13 @@ class AdminEditDetailsModal(discord.ui.Modal):
 
 # --- 5. งานรายวัน (ฉบับแก้ไข Syntax + นับจำนวนคนแบบ Unique) ---
 # --- ฟังก์ชันสรุปรายวัน (คงคำพูดเดิม 100% / แก้ Logic แยกไฟล์ตาม Guild) ---
-# --- 5. งานรายวัน (ฉบับแก้ไขเวลา 00:05 น. สรุปของเมื่อวาน + ป้องกันข้อความยาวเกิน) ---
+# --- 5. งานรายวัน (ฉบับแก้ไขเวลา 00:15 น. สรุปของเมื่อวาน + ป้องกันข้อความยาวเกิน) ---
 @tasks.loop(minutes=1)
 async def daily_report_task():
     n = get_thai_time()
     
-    # ส่งรายงานเวลา 00:05 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
-    if n.hour == 0 and n.minute == 30:
+    # ส่งรายงานเวลา 00:15 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
+    if n.hour == 0 and n.minute == 15:
         for guild in bot.guilds:
             gid = str(guild.id)
             cfg = load_data(gid, "config", {})
