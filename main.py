@@ -737,7 +737,7 @@ async def daily_report_task():
     n = get_thai_time()
     
     # ส่งรายงานเวลา 00:05 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
-    if n.hour == 0 and n.minute == 15:
+    if n.hour == 0 and n.minute == 30:
         for guild in bot.guilds:
             gid = str(guild.id)
             cfg = load_data(gid, "config", {})
@@ -768,31 +768,33 @@ async def daily_report_task():
                             continue
 
                     separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
-                    em = discord.Embed(
-                        title="📋 __รายงานสรุปการลาประจำวัน__",
-                        description=f"📅 **ของวันที่ {target_date.strftime('%d/%m/%Y')}**\n{separator}",
-                        color=0x2B2D31
-                    )
+                    
+                    # เริ่มสร้างเนื้อหาหลักลงใน description (รองรับได้สูงสุด 4096 อักขระ)
+                    desc_content = f"📅 **ของวันที่ {target_date.strftime('%d/%m/%Y')}**\n{separator}\n\n"
 
                     if not daily_grouped:
-                        em.description += "\n\n 🍃 **เมื่อวานนี้ไม่มีสมาชิกแจ้งลาในระบบ**"
+                        desc_content += "🍃 **เมื่อวานนี้ไม่มีสมาชิกแจ้งลาในระบบ**\n"
                     else:
-                        msg = ""
                         for tid, leaves in daily_grouped.items():
                             member = guild.get_member(int(tid))
                             target_name = member.display_name if member else tid
-                            msg += f"👤 **{target_name}**\n"
+                            desc_content += f"👤 **{target_name}**\n"
                             for leaf in leaves:
-                                msg += f" ┗ ` {leaf.get('leave_category','ทั่วไป')} `\n"
-                                msg += f" \u17b5 \u17b5 \u17b5 └ **เหตุผล:** {leaf['reason']}\n"
-                            msg += "\n"
-                        
-                        # ป้องกันข้อความยาวเกินขีดจำกัด 1024 อักขระของ Embed Field
-                        if len(msg) > 1024:
-                            msg = msg[:1020] + "..."
-
-                        em.add_field(name="\u200b", value=msg, inline=False)
+                                desc_content += f" ┗ ` {leaf.get('leave_category','ทั่วไป')} `\n"
+                                desc_content += f" \u17b5 \u17b5 \u17b5 └ **เหตุผล:** {leaf['reason']}\n"
+                            desc_content += "\n"
                     
+                    # หากความยาวรวมยังเกิน 4000 (ในกรณีคนลาเยอะมากๆ) ให้ตัดแบบปลอดภัย
+                    if len(desc_content) > 4000:
+                        desc_content = desc_content[:3990] + "\n... (รายการส่วนที่เหลือถูกตัดเนื่องจากยาวเกินไป)"
+
+                    em = discord.Embed(
+                        title="📋 __รายงานสรุปการลาประจำวัน__",
+                        description=desc_content,
+                        color=0x2B2D31
+                    )
+                    
+                    # ส่วนสรุปจำนวนคนลา ใส่ใน Field ด้านล่างเหมือนเดิม
                     summary_msg = f"{separator}\n"
                     summary_msg += f"📊 **สรุปจำนวนคนลา: {len(daily_grouped)} คน**\n"
                     for cat_name, count in cat_counts.items():
