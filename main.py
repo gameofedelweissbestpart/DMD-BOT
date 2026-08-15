@@ -641,7 +641,7 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
         desc += "🍃 **ไม่มีสมาชิกแจ้งลาในเดือนนี้**\n\n"
 
     if active_list:
-        desc += f"{LONG_SEP}\n**✅ สมาชิกที่ไม่เคยแจ้งลาเลย (Active {len(active_list)} คน):**\n"
+        desc += f"{LONG_SEP}\n**✅ สมาชิกที่ไม่เคยแจ้งลาเลย (จำนวน {len(active_list)} คน):**\n"
         desc += ", ".join([f"**{name}**" for name in active_list]) + "\n"
 
     desc += f"\n{LONG_SEP}\n*👉 เลือกรายชื่อสมาชิกจาก Dropdown ด้านล่างเพื่อดูประวัติเจาะลึก*"
@@ -664,7 +664,7 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
         for start in range(0, len(all_user_opts), 25):
             end = start + 25
             chunk = all_user_opts[start:end]
-            placeholder_text = f"🔍 เลือกสมาชิก (คนประวัติลา/Active {start+1}-{min(end, len(all_user_opts))})..."
+            placeholder_text = f"🔍 เลือกสมาชิก (ลำดับที่ {start+1}-{min(end, len(all_user_opts))})..."
             view.add_item(MonthlyUserSelect(guild, year, month, chunk, placeholder_text))
 
     # 2. เพิ่มปุ่ม "เลือกเดือนใหม่" ต่อท้ายใต้อินพุต Dropdown ทุกอันเสมอ
