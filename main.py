@@ -499,8 +499,8 @@ class MonthlyDetailView(discord.ui.View):
         await send_month_selection(it)
 
 class MonthlyUserSelect(discord.ui.Select):
-    def __init__(self, guild, year, month):
-        super().__init__(placeholder="🔍 เลือกสมาชิกที่ต้องการดูประวัติเจาะลึก...", min_values=1, max_values=1)
+    def __init__(self, guild, year, month, opts, placeholder_str="🔍 เลือกสมาชิกที่ต้องการดูประวัติเจาะลึก..."):
+        super().__init__(placeholder=placeholder_str, options=opts)
         self.guild_obj = guild
         self.year = year
         self.month = month
@@ -526,7 +526,6 @@ class MonthlyUserSelect(discord.ui.Select):
                 try:
                     s_dt = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
                     e_dt = datetime.strptime(e['end_date'], "%d/%m/%Y").date()
-                    # ตรวจสอบว่ามีวันที่คาบเกี่ยวในเดือนนี้หรือไม่
                     if s_dt <= m_end and e_dt >= m_start:
                         overlap_s = max(s_dt, m_start)
                         overlap_e = min(e_dt, m_end)
@@ -536,7 +535,6 @@ class MonthlyUserSelect(discord.ui.Select):
                         cat = e.get('leave_category', 'ทั่วไป')
                         cat_counts[cat] = cat_counts.get(cat, 0) + 1
                         
-                        # เก็บข้อมูลสำหรับแสดงผล
                         user_leaves.append({
                             "data": e,
                             "calc_days": days,
@@ -584,6 +582,7 @@ class MonthlyOverviewView(discord.ui.View):
     @discord.ui.button(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary, row=1)
     async def reselect_month(self, it: discord.Interaction, b: discord.ui.Button):
         await send_month_selection(it)
+
 
 async def generate_and_send_monthly_overview(it: discord.Interaction, guild, year, month):
     gid = str(guild.id)
@@ -651,21 +650,21 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     em = discord.Embed(description=desc, color=0x2B2D31)
     view = MonthlyOverviewView(guild, year, month)
     
-    # เพิ่ม Dropdown รายชื่อคนในแก๊ง (ข้อจำกัด Discord ใส่ได้สูงสุด 25 คน)
-    # ระบบจะดึงคนที่ "ลา" ขึ้นมาให้เลือกก่อน เพื่อให้แอดมินเช็คได้ทันที
-    select_item = MonthlyUserSelect(guild, year, month)
-    user_opts = []
-    
-    for uid, name, _, _ in leaved_list:
-        if len(user_opts) < 25:
-            user_opts.append(discord.SelectOption(label=name, value=uid, emoji="❎"))
+    # --- [รวมตัวเลือกสมาชิกทั้งหมดไว้ใน list] ---
+    all_user_opts = []
+    for uid, name, days, count in leaved_list:
+        all_user_opts.append(discord.SelectOption(label=f"{name} | ลา {days} วัน ({count} ครั้ง)", value=uid, emoji="❎"))
     for uid, data in stats.items():
-        if data["count"] == 0 and len(user_opts) < 25:
-            user_opts.append(discord.SelectOption(label=data["member"].display_name, value=uid, emoji="✅"))
+        if data["count"] == 0:
+            all_user_opts.append(discord.SelectOption(label=f"{data['member'].display_name} | (ไม่เคยลา)", value=uid, emoji="✅"))
     
-    if user_opts:
-        select_item.options = user_opts
-        view.add_item(select_item)
+    # --- [แบ่งชุด Dropdown ละไม่เกิน 25 รายการ] ---
+    if all_user_opts:
+        for start in range(0, len(all_user_opts), 25):
+            end = start + 25
+            chunk = all_user_opts[start:end]
+            placeholder_text = f"🔍 เลือกสมาชิก (คนประวัติลา/Active {start+1}-{min(end, len(all_user_opts))})..."
+            view.add_item(MonthlyUserSelect(guild, year, month, chunk, placeholder_text))
 
     if not it.response.is_done():
         await it.response.send_message(embed=em, view=view, ephemeral=True)
@@ -757,7 +756,7 @@ class AdminLeaveManagementView(discord.ui.View):
             view=view
         )
 
-    @discord.ui.button(label="📊 สรุปประวัติการลา (รายเดือน)", style=discord.ButtonStyle.success, custom_id="admin_monthly_history_btn")
+    @discord.ui.button(label="📊 สรุปประวัติการลา (รายเดือน)", style=discord.ButtonStyle.primary, custom_id="admin_monthly_history_btn")
     async def history_monthly(self, it: discord.Interaction, b):
         await it.response.defer(ephemeral=True)
         await send_month_selection(it)
