@@ -746,11 +746,9 @@ class AdminLeaveManagementView(discord.ui.View):
 
         # --- ส่วนแบ่ง Dropdown ชุดละ 25 รายการ ---
         view = SubMenuView(it) # สร้าง View เปล่า
-        # แบ่ง list all_opts ออกเป็นส่วนๆ ชุดละ 25
         for start in range(0, len(all_opts), 25):
             end = start + 25
             chunk = all_opts[start:end]
-            # ใส่เลขหน้ากำกับที่ Placeholder เพื่อให้แอดมินไม่งง (รักษาคำเดิมและเพิ่มข้อมูลหน้า)
             placeholder_text = f"🔍 เลือกใบลา (รายการที่ {start+1}-{min(end, len(all_opts))})..."
             view.add_item(AdminActionSelect(chunk, placeholder_text))    
             
@@ -759,14 +757,10 @@ class AdminLeaveManagementView(discord.ui.View):
             view=view
         )
 
-    # ---> ให้เพิ่มโค้ดปุ่มใหม่ตรงนี้ <---
     @discord.ui.button(label="📊 สรุปประวัติการลา (รายเดือน)", style=discord.ButtonStyle.success, custom_id="admin_monthly_history_btn")
     async def history_monthly(self, it: discord.Interaction, b):
         await it.response.defer(ephemeral=True)
         await send_month_selection(it)
-
-    @discord.ui.button(label="🗑️ ล้างข้อมูลใบลา (30 วัน)", style=discord.ButtonStyle.primary, custom_id="admin_cleanup_trigger_v2")
-    async def cleanup(self, it: discord.Interaction, b):
 
     @discord.ui.button(label="🗑️ ล้างข้อมูลใบลา (30 วัน)", style=discord.ButtonStyle.primary, custom_id="admin_cleanup_trigger_v2")
     async def cleanup(self, it: discord.Interaction, b):
