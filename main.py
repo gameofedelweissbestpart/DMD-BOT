@@ -483,6 +483,13 @@ class AdminPanelView(discord.ui.View):
 import calendar
 THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
 
+class ReselectMonthButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary)
+
+    async def callback(self, it: discord.Interaction):
+        await send_month_selection(it)
+
 class MonthlyDetailView(discord.ui.View):
     def __init__(self, guild, year, month):
         super().__init__(timeout=120)
@@ -579,11 +586,6 @@ class MonthlyOverviewView(discord.ui.View):
         self.year = year
         self.month = month
 
-    @discord.ui.button(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary, row=1)
-    async def reselect_month(self, it: discord.Interaction, b: discord.ui.Button):
-        await send_month_selection(it)
-
-
 async def generate_and_send_monthly_overview(it: discord.Interaction, guild, year, month):
     gid = str(guild.id)
     leaves = load_data(gid, "leaves", [])
@@ -650,7 +652,6 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     em = discord.Embed(description=desc, color=0x2B2D31)
     view = MonthlyOverviewView(guild, year, month)
     
-    # --- [รวมตัวเลือกสมาชิกทั้งหมดไว้ใน list] ---
     all_user_opts = []
     for uid, name, days, count in leaved_list:
         all_user_opts.append(discord.SelectOption(label=f"{name} | ลา {days} วัน ({count} ครั้ง)", value=uid, emoji="❎"))
@@ -658,13 +659,16 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
         if data["count"] == 0:
             all_user_opts.append(discord.SelectOption(label=f"{data['member'].display_name} | (ไม่เคยลา)", value=uid, emoji="✅"))
     
-    # --- [แบ่งชุด Dropdown ละไม่เกิน 25 รายการ] ---
+    # 1. เพิ่ม Dropdown สมาชิกทั้งหมดก่อน
     if all_user_opts:
         for start in range(0, len(all_user_opts), 25):
             end = start + 25
             chunk = all_user_opts[start:end]
             placeholder_text = f"🔍 เลือกสมาชิก (คนประวัติลา/Active {start+1}-{min(end, len(all_user_opts))})..."
             view.add_item(MonthlyUserSelect(guild, year, month, chunk, placeholder_text))
+
+    # 2. เพิ่มปุ่ม "เลือกเดือนใหม่" ต่อท้ายใต้อินพุต Dropdown ทุกอันเสมอ
+    view.add_item(ReselectMonthButton())
 
     if not it.response.is_done():
         await it.response.send_message(embed=em, view=view, ephemeral=True)
@@ -693,7 +697,6 @@ class MonthSelectView(discord.ui.View):
 async def send_month_selection(it: discord.Interaction):
     now = get_thai_time().date()
     opts = []
-    # คำนวณเดือนย้อนหลัง 3 เดือน
     for i in range(3):
         m = now.month - i
         y = now.year
