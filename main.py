@@ -477,6 +477,239 @@ class AdminPanelView(discord.ui.View):
             ephemeral=True
         ) # <--- ตรวจสอบวงเล็บปิดตรงนี้ ต้องมีวงเล็บปิดครอบพารามิเตอร์ทั้งหมด    
 
+# =====================================================================
+# --- ระบบสรุปประวัติการลาแบบรายเดือน (Monthly Report) ข้อมูลย้อนหลัง 3 เดือน ---
+# =====================================================================
+import calendar
+THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
+
+class MonthlyDetailView(discord.ui.View):
+    def __init__(self, guild, year, month):
+        super().__init__(timeout=120)
+        self.guild = guild
+        self.year = year
+        self.month = month
+
+    @discord.ui.button(label="🔙 ย้อนกลับหน้าภาพรวม", style=discord.ButtonStyle.secondary)
+    async def back_to_overview(self, it: discord.Interaction, b: discord.ui.Button):
+        await generate_and_send_monthly_overview(it, self.guild, self.year, self.month)
+
+    @discord.ui.button(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary)
+    async def reselect_month(self, it: discord.Interaction, b: discord.ui.Button):
+        await send_month_selection(it)
+
+class MonthlyUserSelect(discord.ui.Select):
+    def __init__(self, guild, year, month):
+        super().__init__(placeholder="🔍 เลือกสมาชิกที่ต้องการดูประวัติเจาะลึก...", min_values=1, max_values=1)
+        self.guild_obj = guild
+        self.year = year
+        self.month = month
+
+    async def callback(self, it: discord.Interaction):
+        await it.response.defer(ephemeral=True)
+        target_member_id = self.values[0]
+        target_member = self.guild_obj.get_member(int(target_member_id))
+        target_name = target_member.display_name if target_member else f"ID: {target_member_id}"
+
+        gid = str(it.guild.id)
+        leaves = load_data(gid, "leaves", [])
+        
+        m_start = datetime(self.year, self.month, 1).date()
+        m_end = datetime(self.year, self.month, calendar.monthrange(self.year, self.month)[1]).date()
+
+        user_leaves = []
+        total_days = 0
+        cat_counts = {}
+
+        for e in leaves:
+            if e['target_id'] == target_member_id:
+                try:
+                    s_dt = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
+                    e_dt = datetime.strptime(e['end_date'], "%d/%m/%Y").date()
+                    # ตรวจสอบว่ามีวันที่คาบเกี่ยวในเดือนนี้หรือไม่
+                    if s_dt <= m_end and e_dt >= m_start:
+                        overlap_s = max(s_dt, m_start)
+                        overlap_e = min(e_dt, m_end)
+                        days = (overlap_e - overlap_s).days + 1
+                        
+                        total_days += days
+                        cat = e.get('leave_category', 'ทั่วไป')
+                        cat_counts[cat] = cat_counts.get(cat, 0) + 1
+                        
+                        # เก็บข้อมูลสำหรับแสดงผล
+                        user_leaves.append({
+                            "data": e,
+                            "calc_days": days,
+                            "dr": f"{e['start_date']}" if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
+                        })
+                except:
+                    continue
+
+        month_name = f"{THAI_MONTHS[self.month-1]} {self.year}"
+        em = discord.Embed(title=f"👤 ประวัติการลา: {target_name}", description=f"📅 **ประจำเดือน {month_name}**\n{LONG_SEP}", color=0x3498db)
+        
+        if not user_leaves:
+            em.description += "\n\n🍃 **สมาชิกท่านนี้ไม่มีประวัติการแจ้งลาในเดือนที่เลือก**"
+        else:
+            cat_summary = " | ".join([f"{k}: {v} ครั้ง" for k, v in cat_counts.items()])
+            em.description += f"\n📊 **รวมการลาในเดือนนี้:** `{len(user_leaves)}` ครั้ง | รวม `{total_days}` วัน\n"
+            em.description += f"📌 **แยกตามประเภท:** {cat_summary}\n{LONG_SEP}\n\n"
+            
+            for idx, item in enumerate(user_leaves, 1):
+                leaf = item["data"]
+                calc_days = item["calc_days"]
+                
+                on_behalf = ""
+                if leaf['user_id'] != leaf['target_id']:
+                    ex_m = it.guild.get_member(int(leaf['user_id']))
+                    ex_name = ex_m.display_name if ex_m else f"<@{leaf['user_id']}>"
+                    on_behalf = f" *(ผู้แจ้งแทน: {ex_name})*"
+
+                em.description += f"**{idx}. `[{leaf.get('leave_category', 'ทั่วไป')}]`**\n"
+                em.description += f" ┗ 📅 วันที่ลา: {item['dr']} `(นับเฉพาะในเดือนนี้ {calc_days} วัน)`\n"
+                em.description += f" ┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
+
+        if len(em.description) > 4000:
+            em.description = em.description[:3990] + "\n..."
+        
+        await it.edit_original_response(embed=em, view=MonthlyDetailView(self.guild_obj, self.year, self.month))
+
+class MonthlyOverviewView(discord.ui.View):
+    def __init__(self, guild, year, month):
+        super().__init__(timeout=120)
+        self.guild = guild
+        self.year = year
+        self.month = month
+
+    @discord.ui.button(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary, row=1)
+    async def reselect_month(self, it: discord.Interaction, b: discord.ui.Button):
+        await send_month_selection(it)
+
+async def generate_and_send_monthly_overview(it: discord.Interaction, guild, year, month):
+    gid = str(guild.id)
+    leaves = load_data(gid, "leaves", [])
+    
+    m_start = datetime(year, month, 1).date()
+    m_end = datetime(year, month, calendar.monthrange(year, month)[1]).date()
+
+    target_role_id = 1456228588968739028
+    exclude_role_id = 1498319593939144755
+    gang_members = [m for m in guild.members if any(r.id == target_role_id for r in m.roles) and not any(r.id == exclude_role_id for r in m.roles)]
+    if not gang_members:
+        gang_members = [m for m in guild.members if not m.bot]
+
+    stats = {}
+    for m in gang_members:
+        stats[str(m.id)] = {"member": m, "days": 0, "count": 0}
+
+    for e in leaves:
+        try:
+            s_dt = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
+            e_dt = datetime.strptime(e['end_date'], "%d/%m/%Y").date()
+            if s_dt <= m_end and e_dt >= m_start:
+                tid = e['target_id']
+                if tid in stats:
+                    overlap_s = max(s_dt, m_start)
+                    overlap_e = min(e_dt, m_end)
+                    days = (overlap_e - overlap_s).days + 1
+                    stats[tid]["count"] += 1
+                    stats[tid]["days"] += days
+        except:
+            continue
+
+    leaved_list = []
+    active_list = []
+    for uid, data in stats.items():
+        m = data["member"]
+        if data["count"] > 0:
+            leaved_list.append((uid, m.display_name, data["days"], data["count"]))
+        else:
+            active_list.append(m.display_name)
+
+    leaved_list.sort(key=lambda x: (x[2], x[3]), reverse=True)
+
+    month_name = f"{THAI_MONTHS[month-1]} {year}"
+    desc = f"# 📊 สรุปประวัติการลาประจำเดือน {month_name}\n{LONG_SEP}\n\n"
+
+    if leaved_list:
+        desc += "**❎ สมาชิกที่มีประวัติการลา:**\n"
+        for idx, item in enumerate(leaved_list, 1):
+            desc += f"`{idx}.` **{item[1]}** — รวม `{item[2]}` วัน (`{item[3]}` ครั้ง)\n"
+        desc += "\n"
+    else:
+        desc += "🍃 **ไม่มีสมาชิกแจ้งลาในเดือนนี้**\n\n"
+
+    if active_list:
+        desc += f"{LONG_SEP}\n**✅ สมาชิกที่ไม่เคยแจ้งลาเลย (Active {len(active_list)} คน):**\n"
+        desc += ", ".join([f"**{name}**" for name in active_list]) + "\n"
+
+    desc += f"\n{LONG_SEP}\n*👉 เลือกรายชื่อสมาชิกจาก Dropdown ด้านล่างเพื่อดูประวัติเจาะลึก*"
+    
+    if len(desc) > 4000:
+        desc = desc[:3990] + "\n..."
+
+    em = discord.Embed(description=desc, color=0x2B2D31)
+    view = MonthlyOverviewView(guild, year, month)
+    
+    # เพิ่ม Dropdown รายชื่อคนในแก๊ง (ข้อจำกัด Discord ใส่ได้สูงสุด 25 คน)
+    # ระบบจะดึงคนที่ "ลา" ขึ้นมาให้เลือกก่อน เพื่อให้แอดมินเช็คได้ทันที
+    select_item = MonthlyUserSelect(guild, year, month)
+    user_opts = []
+    
+    for uid, name, _, _ in leaved_list:
+        if len(user_opts) < 25:
+            user_opts.append(discord.SelectOption(label=name, value=uid, emoji="❎"))
+    for uid, data in stats.items():
+        if data["count"] == 0 and len(user_opts) < 25:
+            user_opts.append(discord.SelectOption(label=data["member"].display_name, value=uid, emoji="✅"))
+    
+    if user_opts:
+        select_item.options = user_opts
+        view.add_item(select_item)
+
+    if not it.response.is_done():
+        await it.response.send_message(embed=em, view=view, ephemeral=True)
+    else:
+        await it.edit_original_response(content=None, embed=em, view=view)
+
+class MonthSelect(discord.ui.Select):
+    def __init__(self, opts):
+        super().__init__(placeholder="📅 เลือกเดือนที่ต้องการดูสรุป...", options=opts)
+    async def callback(self, it: discord.Interaction):
+        await it.response.defer(ephemeral=True)
+        year, month = map(int, self.values[0].split('-'))
+        await generate_and_send_monthly_overview(it, it.guild, year, month)
+
+class MonthSelectView(discord.ui.View):
+    def __init__(self, opts):
+        super().__init__(timeout=120)
+        self.add_item(MonthSelect(opts))
+
+    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
+    async def close_menu(self, it: discord.Interaction, b: discord.ui.Button):
+        await it.response.defer()
+        try: await it.delete_original_response()
+        except: pass
+
+async def send_month_selection(it: discord.Interaction):
+    now = get_thai_time().date()
+    opts = []
+    # คำนวณเดือนย้อนหลัง 3 เดือน
+    for i in range(3):
+        m = now.month - i
+        y = now.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        opts.append(discord.SelectOption(label=f"{THAI_MONTHS[m-1]} {y}", value=f"{y}-{m:02d}", emoji="📅"))
+    
+    txt = "📅 **กรุณาเลือกเดือนที่ต้องการดูสรุปประวัติการลา:**"
+    if not it.response.is_done():
+        await it.response.send_message(content=txt, embed=None, view=MonthSelectView(opts), ephemeral=True)
+    else:
+        await it.edit_original_response(content=txt, embed=None, view=MonthSelectView(opts))
+# =====================================================================
+
 # --- 4. ส่วน Admin (คงคำพูดเดิม / แก้ Logic แยกไฟล์) ---
 class AdminLeaveManagementView(discord.ui.View):
     def __init__(self):
@@ -525,6 +758,15 @@ class AdminLeaveManagementView(discord.ui.View):
             content="🛠 **แอดมินจัดการใบลา:** เลือกรายการที่ต้องการจัดการ:", 
             view=view
         )
+
+    # ---> ให้เพิ่มโค้ดปุ่มใหม่ตรงนี้ <---
+    @discord.ui.button(label="📊 สรุปประวัติการลา (รายเดือน)", style=discord.ButtonStyle.success, custom_id="admin_monthly_history_btn")
+    async def history_monthly(self, it: discord.Interaction, b):
+        await it.response.defer(ephemeral=True)
+        await send_month_selection(it)
+
+    @discord.ui.button(label="🗑️ ล้างข้อมูลใบลา (30 วัน)", style=discord.ButtonStyle.primary, custom_id="admin_cleanup_trigger_v2")
+    async def cleanup(self, it: discord.Interaction, b):
 
     @discord.ui.button(label="🗑️ ล้างข้อมูลใบลา (30 วัน)", style=discord.ButtonStyle.primary, custom_id="admin_cleanup_trigger_v2")
     async def cleanup(self, it: discord.Interaction, b):
