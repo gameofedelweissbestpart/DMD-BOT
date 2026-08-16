@@ -552,27 +552,26 @@ class MonthlyUserSelect(discord.ui.Select):
             em.description += f"📌 **แยกตามประเภท:** {cat_summary}\n{LONG_SEP}\n\n"
             
             for idx, item in enumerate(user_leaves, 1):
-            leaf = item["data"]
-            calc_days = item["calc_days"]
-            total_days = leaf.get('total_days', calc_days)
-            
-            # เช็กว่าเป็นการลาข้ามเดือนหรือไม่ (ถ้าลาข้ามเดือน จะแสดงรวมทั้งสิ้นด้วย)
-            if total_days > calc_days:
-                day_txt = f"(นับเฉพาะในเดือนนี้ {calc_days} วัน / รวมทั้งสิ้น {total_days} วัน)"
-            else:
-                day_txt = f"(นับเฉพาะในเดือนนี้ {calc_days} วัน)"
+                leaf = item["data"]
+                calc_days = item["calc_days"]
+                total_days = leaf.get('total_days', calc_days)
+                
+                if total_days > calc_days:
+                    day_txt = f"(นับเฉพาะในเดือนนี้ {calc_days} วัน / รวมทั้งสิ้น {total_days} วัน)"
+                else:
+                    day_txt = f"(นับเฉพาะในเดือนนี้ {calc_days} วัน)"
 
-            on_behalf = ""
-            if leaf['user_id'] != leaf['target_id']:
-                ex_m = it.guild.get_member(int(leaf['user_id']))
-                ex_name = ex_m.display_name if ex_m else f"<@{leaf['user_id']}>"
-                on_behalf = f" *(ผู้แจ้งแทน: {ex_name})*"
+                on_behalf = ""
+                if leaf['user_id'] != leaf['target_id']:
+                    ex_m = it.guild.get_member(int(leaf['user_id']))
+                    ex_name = ex_m.display_name if ex_m else f"<@{leaf['user_id']}>"
+                    on_behalf = f" *(ผู้แจ้งแทน: {ex_name})*"
 
-            em.description += (
-                f"**{idx}. `[{leaf.get('leave_category', 'ทั่วไป')}]`**\n"
-                f"┗ 📅 วันที่ลา: {item['dr']} `{day_txt}`\n"
-                f"┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
-            )
+                em.description += (
+                    f"**{idx}. `[{leaf.get('leave_category', 'ทั่วไป')}]`**\n"
+                    f"┗ 📅 วันที่ลา: {item['dr']} `{day_txt}`\n"
+                    f"┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
+                )
 
         if len(em.description) > 4000:
             em.description = em.description[:3990] + "\n..."
