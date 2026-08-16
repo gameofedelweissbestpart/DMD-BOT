@@ -492,7 +492,7 @@ class ReselectMonthButton(discord.ui.Button):
 
 class MonthlyDetailView(discord.ui.View):
     def __init__(self, guild, year, month):
-        super().__init__(timeout=120)
+        super().__init__(timeout=600)  # ขยายเวลาเป็น 10 นาที (600 วินาที)
         self.guild = guild
         self.year = year
         self.month = month
@@ -581,7 +581,7 @@ class MonthlyUserSelect(discord.ui.Select):
 
 class MonthlyOverviewView(discord.ui.View):
     def __init__(self, guild, year, month):
-        super().__init__(timeout=120)
+        super().__init__(timeout=600)  # ขยายเวลาเป็น 10 นาที (600 วินาที)
         self.guild = guild
         self.year = year
         self.month = month
@@ -685,7 +685,7 @@ class MonthSelect(discord.ui.Select):
 
 class MonthSelectView(discord.ui.View):
     def __init__(self, opts):
-        super().__init__(timeout=120)
+        super().__init__(timeout=600)  # ขยายเวลาเป็น 10 นาที (600 วินาที)
         self.add_item(MonthSelect(opts))
 
     @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
