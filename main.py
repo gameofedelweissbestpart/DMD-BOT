@@ -722,9 +722,10 @@ class AdminLeaveManagementView(discord.ui.View):
         gid = str(it.guild.id)
         d = load_data(gid, "leaves", []) # โหลดข้อมูลแยกตาม Guild
         now_date = get_thai_time().date()
+        
         # [1] กำหนดเกณฑ์ย้อนหลัง 14 วัน
         limit_back_date = now_date - timedelta(days=14)
-        all_opts = [] # เปลี่ยนเป็นเก็บทั้งหมดก่อน
+        all_opts = []
         
         for i, e in enumerate(d):
             try:
@@ -746,13 +747,27 @@ class AdminLeaveManagementView(discord.ui.View):
         if not all_opts: 
             return await it.response.send_message("🍃 **ขณะนี้ไม่มีรายการใบลาที่กำลังดำเนินการอยู่**", ephemeral=True)
 
-        # --- ส่วนแบ่ง Dropdown ชุดละ 25 รายการ ---
-        view = SubMenuView(it) # สร้าง View เปล่า
+        # --- [ปรับปรุง Logic การใส่ Dropdown และต่อปุ่มปิดเมนูไว้ล่างสุด] ---
+        view = discord.ui.View(timeout=300)
+        
+        # 1. ใส่ Dropdown ให้ครบทุกหน้าก่อน
         for start in range(0, len(all_opts), 25):
             end = start + 25
             chunk = all_opts[start:end]
             placeholder_text = f"🔍 เลือกใบลา (รายการที่ {start+1}-{min(end, len(all_opts))})..."
-            view.add_item(AdminActionSelect(chunk, placeholder_text))    
+            view.add_item(AdminActionSelect(chunk, placeholder_text))
+            
+        # 2. สร้างปุ่มปิดเมนูต่อท้ายสุด (จะอยู่บรรทัดล่างสุดเสมอ)
+        close_btn = discord.ui.Button(label="ปิดเมนู", style=discord.ButtonStyle.danger)
+        
+        async def close_callback(btn_it: discord.Interaction):
+            await btn_it.response.defer()
+            try: await btn_it.delete_original_response()
+            except: pass
+            
+        close_btn.callback = close_callback
+        view.add_item(close_btn)
+        # -----------------------------------------------------------------
             
         await it.response.edit_message(
             content="🛠 **แอดมินจัดการใบลา:** เลือกรายการที่ต้องการจัดการ:", 
