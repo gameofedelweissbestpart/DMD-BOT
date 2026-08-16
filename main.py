@@ -552,18 +552,27 @@ class MonthlyUserSelect(discord.ui.Select):
             em.description += f"📌 **แยกตามประเภท:** {cat_summary}\n{LONG_SEP}\n\n"
             
             for idx, item in enumerate(user_leaves, 1):
-                leaf = item["data"]
-                calc_days = item["calc_days"]
-                
-                on_behalf = ""
-                if leaf['user_id'] != leaf['target_id']:
-                    ex_m = it.guild.get_member(int(leaf['user_id']))
-                    ex_name = ex_m.display_name if ex_m else f"<@{leaf['user_id']}>"
-                    on_behalf = f" *(ผู้แจ้งแทน: {ex_name})*"
+            leaf = item["data"]
+            calc_days = item["calc_days"]
+            total_days = leaf.get('total_days', calc_days)
+            
+            # เช็กว่าเป็นการลาข้ามเดือนหรือไม่ (ถ้าลาข้ามเดือน จะแสดงรวมทั้งสิ้นด้วย)
+            if total_days > calc_days:
+                day_txt = f"(นับเฉพาะในเดือนนี้ {calc_days} วัน / รวมทั้งสิ้น {total_days} วัน)"
+            else:
+                day_txt = f"(นับเฉพาะในเดือนนี้ {calc_days} วัน)"
 
-                em.description += f"**{idx}. `[{leaf.get('leave_category', 'ทั่วไป')}]`**\n"
-                em.description += f" ┗ 📅 วันที่ลา: {item['dr']} `(นับเฉพาะในเดือนนี้ {calc_days} วัน)`\n"
-                em.description += f" ┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
+            on_behalf = ""
+            if leaf['user_id'] != leaf['target_id']:
+                ex_m = it.guild.get_member(int(leaf['user_id']))
+                ex_name = ex_m.display_name if ex_m else f"<@{leaf['user_id']}>"
+                on_behalf = f" *(ผู้แจ้งแทน: {ex_name})*"
+
+            em.description += (
+                f"**{idx}. `[{leaf.get('leave_category', 'ทั่วไป')}]`**\n"
+                f"┗ 📅 วันที่ลา: {item['dr']} `{day_txt}`\n"
+                f"┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
+            )
 
         if len(em.description) > 4000:
             em.description = em.description[:3990] + "\n..."
@@ -1149,7 +1158,7 @@ class CancelReasonModal(discord.ui.Modal):
                     
                     log_em = discord.Embed(title=log_title, color=log_color)
                     log_em.description = (
-                        f"**👤 สมาชิกที่ลา:** {tn}\n\n"
+                        f"**👤 สมาชิกที่ลา:** {tn}\n"
                         f"{executor_txt}"
                         f"**📝 รายละเอียดรายการที่ถูกยกเลิก:**\n"
                         f" • **วันที่ลา:** {dr} `({old_data.get('total_days', 1)} วัน)`\n"
@@ -1572,7 +1581,7 @@ async def on_ready():
     bot.add_view(AdminPanelView())         # หน้าหลัก !admin
     bot.add_view(CategorySelectionView())  # หน้าเลือกหมวดหมู่ (แจ้งลา/แจ้งปรับเงิน)
     bot.add_view(AdminLeaveManagementView()) # ระบบลา/จัดการใบลา
-    bot.add_view(ConfirmClearView())       # หน้ากดยืนยัน Cleanup 30 วัน
+    bot.add_view(ConfirmClearView())       # หน้ากดยืนยัน Cleanup 120 วัน
     
     print(f'✅ {bot.user.name} ออนไลน์เรียบร้อย | ระบบปี 2026 พร้อมใช้งาน')
     if not daily_report_task.is_running(): daily_report_task.start()
