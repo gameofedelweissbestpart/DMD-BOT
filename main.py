@@ -567,6 +567,7 @@ class MonthlyUserSelect(discord.ui.Select):
                     ex_name = ex_m.display_name if ex_m else f"<@{leaf['user_id']}>"
                     on_behalf = f" *(ผู้แจ้งแทน: {ex_name})*"
 
+                # ดึงขึ้นมาชิดทันที ไม่มีช่องว่างหน้า ┗ และตัด \n เกินออก
                 em.description += (
                     f"**{idx}. `[{leaf.get('leave_category', 'ทั่วไป')}]`**\n"
                     f"┗ 📅 วันที่ลา: {item['dr']} `{day_txt}`\n"
