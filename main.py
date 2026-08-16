@@ -250,11 +250,12 @@ class RetryView(discord.ui.View):
             pass
 
 # --- 4. ส่วน Admin (ปรับหัวข้อหน้าหลักตามสั่ง + หมายเหตุใหม่) ---
+# --- 1. วางทับคลาส ConfirmClearView ---
 class ConfirmClearView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None) 
 
-    @discord.ui.button(label="⚠️ ยืนยันล้างข้อมูลเก่า (ย้อนหลัง 1 เดือน)", 
+    @discord.ui.button(label="⚠️ ยืนยันล้างข้อมูลเก่า (ย้อนหลัง 4 เดือน / 120 วัน)", 
                        style=discord.ButtonStyle.success, 
                        custom_id="admin_confirm_cleanup_v1") 
     async def confirm(self, it: discord.Interaction, b: discord.ui.Button):
@@ -272,19 +273,18 @@ class ConfirmClearView(discord.ui.View):
             if os.path.exists(path_leaves): f_send.append(discord.File(path_leaves))
             if os.path.exists(path_config): f_send.append(discord.File(path_config))
             
-            # ส่ง DM ตรงหา it.user (ผู้กดปุ่ม) พร้อมคำพูดเดิม
+            # ส่ง DM ตรงหา it.user (ผู้กดปุ่ม)
             await it.user.send(
                 f"📦 **Backup ก่อน Cleanup:** ท่านได้ดำเนินการล้างข้อมูลเก่า\nนี่คือไฟล์สำรองข้อมูลส่วนตัวของท่านครับ:", 
                 files=f_send
             )
         except discord.Forbidden:
-            # คงคำพูดเดิม
             return await it.followup.send("❌ ไม่สามารถส่งไฟล์สำรองได้ โปรดเปิด DM แล้วลองใหม่อีกครั้ง", ephemeral=True)
 
-        # [3] กรองข้อมูลย้อนหลัง 30 วัน (แยกตาม Guild)
+        # [3] กรองข้อมูลย้อนหลัง 120 วัน (4 เดือน) (แยกตาม Guild)
         d = load_data(gid, "leaves", [])
         now = get_thai_time().date()
-        threshold_date = now - timedelta(days=30) 
+        threshold_date = now - timedelta(days=120) 
         filtered_data = []
         removed_count = 0
         
@@ -300,9 +300,8 @@ class ConfirmClearView(discord.ui.View):
 
         # [4] บันทึกข้อมูลและแจ้งผล (แยกตาม Guild)
         save_data(gid, "leaves", filtered_data)
-        await update_summary_board(it.guild) # ส่ง Object Guild เพื่ออัปเดตบอร์ดให้ถูกที่
         
-        # ส่ง Log สีส้มเข้าห้อง Log ตามปกติ
+        # ส่ง Log สีส้มเข้าห้อง Log ตามปกติ (ตัดคำสั่ง update_summary_board ออกตามตกลง)
         cfg = load_data(gid, "config", {})
         log_ch_id = cfg.get("log_ch")
         if log_ch_id:
@@ -311,7 +310,7 @@ class ConfirmClearView(discord.ui.View):
                 l_em = discord.Embed(title="⚠️ ประกาศ: Cleanup ข้อมูลใบลาประจำเดือน", color=0xf39c12)
                 l_em.description = (
                     f"**👮 ผู้ดำเนินการ:** {it.user.display_name}\n"
-                    f"**🧹 ลบข้อมูลที่เก่ากว่า:** {threshold_date.strftime('%d/%m/%Y')}\n"
+                    f"**🧹 ลบข้อมูลที่เก่ากว่า:** {threshold_date.strftime('%d/%m/%Y')} *(120 วัน)*\n"
                     f"**📊 จำนวนที่ลบออก:** `{removed_count}` รายการ\n"
                     f"**📦 ข้อมูลคงเหลือ:** `{len(filtered_data)}` รายการ\n\n"
                     f"{LONG_SEP}"
@@ -319,22 +318,14 @@ class ConfirmClearView(discord.ui.View):
                 l_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
                 await log_ch.send(embed=l_em)
             
-        # [5] อัปเดตข้อความลับแจ้งผู้ใช้ (คงคำพูดเดิม)[cite: 1]
+        # [5] อัปเดตข้อความลับแจ้งผู้ใช้
         await it.edit_original_response(
-            content=f"✅ Cleanup สำเร็จ! ลบข้อมูลเก่า `{removed_count}` รายการเรียบร้อยแล้ว (ไฟล์ส่งเข้า DM ท่านแล้ว)", 
+            content=f"✅ Cleanup สำเร็จ! ลบข้อมูลเก่าที่เกิน 120 วัน ออกไป `{removed_count}` รายการเรียบร้อยแล้ว (ไฟล์ส่งเข้า DM ท่านแล้ว)", 
             view=None
         )
         
         await asyncio.sleep(3)
         try:
-            await it.delete_original_response()
-        except:
-            pass
-
-    @discord.ui.button(label="ยกเลิก", style=discord.ButtonStyle.danger, custom_id="admin_close_cleanup_panel")
-    async def close_menu(self, it: discord.Interaction, button: discord.ui.Button):
-        try:
-            await it.response.defer()
             await it.delete_original_response()
         except:
             pass
@@ -779,9 +770,9 @@ class AdminLeaveManagementView(discord.ui.View):
         await it.response.defer(ephemeral=True)
         await send_month_selection(it)
 
-    @discord.ui.button(label="🗑️ ล้างข้อมูลใบลา (30 วัน)", style=discord.ButtonStyle.primary, custom_id="admin_cleanup_trigger_v2")
+    @discord.ui.button(label="🗑️ ล้างข้อมูลใบลา (120 วัน)", style=discord.ButtonStyle.primary, custom_id="admin_cleanup_trigger_v2")
     async def cleanup(self, it: discord.Interaction, b):
-        txt = "⚠️ **คุณยืนยันที่จะ Cleanup ข้อมูลใบลาที่เก่ากว่า 1 เดือนใช่หรือไม่?**\nระบบจะส่งไฟล์ Backup ให้คุณก่อนดำเนินการ"
+        txt = "⚠️ **คุณยืนยันที่จะ Cleanup ข้อมูลใบลาที่เก่ากว่า 4 เดือน (120 วัน) ใช่หรือไม่?**\nระบบจะส่งไฟล์ Backup ให้คุณก่อนดำเนินการ"
         await it.response.send_message(content=txt, view=ConfirmClearView(), ephemeral=True)
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, custom_id="admin_close_leave_system_v2")
@@ -1585,6 +1576,6 @@ async def on_ready():
     
     print(f'✅ {bot.user.name} ออนไลน์เรียบร้อย | ระบบปี 2026 พร้อมใช้งาน')
     if not daily_report_task.is_running(): daily_report_task.start()
-    if not weekly_report_task.is_running(): weekly_report_task.start()
+    # if not weekly_report_task.is_running(): weekly_report_task.start()
 
 bot.run(TOKEN)
