@@ -969,13 +969,13 @@ class AdminEditDetailsModal(discord.ui.Modal):
 
 # --- 5. งานรายวัน (ฉบับแก้ไข Syntax + นับจำนวนคนแบบ Unique) ---
 # --- ฟังก์ชันสรุปรายวัน (คงคำพูดเดิม 100% / แก้ Logic แยกไฟล์ตาม Guild) ---
-# --- 5. งานรายวัน (ฉบับแก้ไขเวลา 00:15 น. สรุปของเมื่อวาน + ป้องกันข้อความยาวเกิน) ---
+# --- 5. งานรายวัน (ฉบับแก้ไขเวลา 00:05 น. สรุปของเมื่อวาน + ป้องกันข้อความยาวเกิน) ---
 @tasks.loop(minutes=1)
 async def daily_report_task():
     n = get_thai_time()
     
-    # ส่งรายงานเวลา 00:15 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
-    if n.hour == 0 and n.minute == 15:
+    # ส่งรายงานเวลา 00:05 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
+    if n.hour == 0 and n.minute == 5:
         for guild in bot.guilds:
             gid = str(guild.id)
             cfg = load_data(gid, "config", {})
@@ -985,11 +985,14 @@ async def daily_report_task():
                 ch = bot.get_channel(int(ch_id))
                 if ch:
                     data = load_data(gid, "leaves", [])
+                    cancelled_data = load_data(gid, "cancelled_leaves", [])
                     target_date = (n - timedelta(days=1)).date()
+                    target_date_str = target_date.strftime('%d/%m/%Y')
                     
                     daily_grouped = {}
                     cat_counts = {}
 
+                    # 1. กรองคนลาปกติ
                     for e in data:
                         try:
                             start_dt = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
@@ -1005,13 +1008,22 @@ async def daily_report_task():
                         except:
                             continue
 
-                    separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
-                    
-                    # เริ่มสร้างเนื้อหาหลักลงใน description (รองรับได้สูงสุด 4096 อักขระ)
-                    desc_content = f"📅 **ของวันที่ {target_date.strftime('%d/%m/%Y')}**\n{separator}\n\n"
+                    # 2. กรองคนที่กดยกเลิกใบลาในวันดังกล่าว
+                    cancelled_today = []
+                    for c in cancelled_data:
+                        try:
+                            c_dt = datetime.strptime(c['cancelled_at'].split()[0], "%d/%m/%Y").date()
+                            if c_dt == target_date:
+                                cancelled_today.append(c)
+                        except:
+                            continue
 
+                    separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+                    desc_content = f"📅 **ของวันที่ {target_date_str}**\n{separator}\n\n"
+
+                    # แสดงส่วนที่ 1: รายชื่อคนลาปกติ
                     if not daily_grouped:
-                        desc_content += "🍃 **เมื่อวานนี้ไม่มีสมาชิกแจ้งลาในระบบ**\n"
+                        desc_content += "🍃 **เมื่อวานนี้ไม่มีสมาชิกแจ้งลาในระบบ**\n\n"
                     else:
                         for tid, leaves in daily_grouped.items():
                             member = guild.get_member(int(tid))
@@ -1021,8 +1033,25 @@ async def daily_report_task():
                                 desc_content += f" ┗ ` {leaf.get('leave_category','ทั่วไป')} `\n"
                                 desc_content += f" \u17b5 \u17b5 \u17b5 └ **เหตุผล:** {leaf['reason']}\n"
                             desc_content += "\n"
-                    
-                    # หากความยาวรวมยังเกิน 4000 (ในกรณีคนลาเยอะมากๆ) ให้ตัดแบบปลอดภัย
+
+                    # แสดงส่วนที่ 2: รายชื่อคนที่กดยกเลิกใบลาในวันนั้น
+                    desc_content += f"{separator}\n"
+                    if cancelled_today:
+                        desc_content += "**🚫 รายการใบลาที่ถูกยกเลิกในวันนี้:**\n\n"
+                        for c in cancelled_today:
+                            target_m = guild.get_member(int(c['target_id']))
+                            t_name = target_m.display_name if target_m else c.get('name', 'Unknown')
+                            c_time = c['cancelled_at'].split()[1][:5] # ดึงเฉพาะ HH:mm
+                            
+                            admin_tag = " (Admin)" if c.get('is_admin_cancel') else ""
+                            by_txt = f" (ผู้ยกเลิก: {c.get('cancelled_by_name', '-')}{admin_tag})" if c['cancelled_by'] != c['target_id'] else ""
+
+                            desc_content += f"👤 **{t_name}** `[ยกเลิกเมื่อ {c_time} น.]{by_txt}`\n"
+                            desc_content += f" ┗ 📅 เดิมลา: {c['start_date']} - {c['end_date']} `({c.get('leave_category','ทั่วไป')})`\n"
+                            desc_content += f" \u17b5 \u17b5 \u17b5 └ **เหตุผลยกเลิก:** {c.get('cancel_reason', '-')}\n\n"
+                    else:
+                        desc_content += "🍃 **ไม่มีรายการยกเลิกใบลาในวันนี้**\n\n"
+
                     if len(desc_content) > 4000:
                         desc_content = desc_content[:3990] + "\n... (รายการส่วนที่เหลือถูกตัดเนื่องจากยาวเกินไป)"
 
@@ -1032,14 +1061,13 @@ async def daily_report_task():
                         color=0x2B2D31
                     )
                     
-                    # ส่วนสรุปจำนวนคนลา ใส่ใน Field ด้านล่างเหมือนเดิม
                     summary_msg = f"{separator}\n"
-                    summary_msg += f"📊 **สรุปจำนวนคนลา: {len(daily_grouped)} คน**\n"
+                    summary_msg += f"📊 **สรุปจำนวนคนลาวันนี้: {len(daily_grouped)} คน** | **ยกเลิก: {len(cancelled_today)} รายการ**\n"
                     for cat_name, count in cat_counts.items():
                         summary_msg += f"• {cat_name}: `{count}` ครั้ง\n"
                     
                     em.add_field(name="\u200b", value=summary_msg, inline=False)
-                    em.set_footer(text=f"ระบบรายงานอัตโนมัติ: {n.strftime('%d/%m/%Y %H:%M น.')}")
+                    em.set_footer(text=f"ระบบรายงานอัตโนมัติ: {n.strftime('%d/%m/%Y เวลา %H:%M น.')}")
                     await ch.send(embed=em)
 
 # เพิ่มตัวช่วยให้ Loop ทำงานเสถียร ไม่ค้าง
@@ -1054,7 +1082,8 @@ async def daily_report_error(error):
         daily_report_task.restart()
 
 
-# --- 6. ระบบยกเลิกใบลา (ฉบับปรับปรุง: ตัดชื่อผู้ดำเนินการตามเงื่อนไขที่คุณย้ำ) ---
+# --- 6. ระบบยกเลิกใบลา (ฉบับปรับปรุง: เพิ่มการเก็บบันทึกข้อมูลยกเลิกใบลาลงไฟล์ (cancelled_leaves.json) ---
+# โดยเพิ่มคำสั่งบันทึกรายการที่ถูกยกเลิก พร้อมลงเวลา cancelled_at เพื่อดึงมาแสดงผล
 class CancelReasonModal(discord.ui.Modal):
     def __init__(self, target_idx, od, is_admin_request=False): 
         super().__init__(title="ระบุเหตุผลการยกเลิก")
@@ -1065,32 +1094,44 @@ class CancelReasonModal(discord.ui.Modal):
     
     async def on_submit(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
-        gid = str(it.guild.id) # ระบุ ID เซิร์ฟเวอร์
+        gid = str(it.guild.id)
         
-        # แก้ Logic: โหลดและบันทึกแยกไฟล์ตาม Guild ID
         d = load_data(gid, "leaves", []) 
         if 0 <= self.target_idx < len(d):
             old_data = d.pop(self.target_idx)
             save_data(gid, "leaves", d)
+            
+            # --- [บันทึกข้อมูลใบลาที่ถูกยกเลิกลงไฟล์ cancelled_leaves.json] ---
+            cancelled_data = load_data(gid, "cancelled_leaves", [])
+            cancelled_entry = old_data.copy()
+            cancelled_entry.update({
+                "cancelled_by": str(it.user.id),
+                "cancelled_by_name": it.user.display_name,
+                "cancel_reason": self.reason.value,
+                "cancelled_at": get_thai_time().strftime("%d/%m/%Y %H:%M:%S"),
+                "is_admin_cancel": self.is_admin_request
+            })
+            cancelled_data.append(cancelled_entry)
+            save_data(gid, "cancelled_leaves", cancelled_data)
+            # -----------------------------------------------------------------
+
             await update_summary_board(it.guild)
             
-            cfg = load_data(gid, "config", {}) # โหลด Config ของ Guild นี้
+            cfg = load_data(gid, "config", {})
             log_ch_id = cfg.get("log_ch")
             if log_ch_id:
                 log_ch = bot.get_channel(int(log_ch_id))
                 if log_ch:
-                    # --- [เพิ่ม Logic ตรวจสอบผู้ดำเนินการ โดยไม่เปลี่ยนคำเดิม] ---
                     u_id = str(it.user.id)
                     target_uid = old_data['target_id']
                     executor_name = it.user.display_name
                     
-                    # ตรวจสอบว่าเป็น Admin หรือ เป็นการยกเลิกแทนเพื่อน
                     if self.is_admin_request:
                         executor_txt = f"**👮 ผู้ดำเนินการ:** {executor_name} (Admin)\n\n"
                     elif u_id != target_uid:
                         executor_txt = f"**👤 ผู้ดำเนินการ (ยกเลิกแทน):** {executor_name}\n\n"
                     else:
-                        executor_txt = "" # ถ้าเจ้าของยกเลิกเอง ไม่ต้องแสดงบรรทัดนี้
+                        executor_txt = ""
 
                     log_title = "📌 บันทึกการจัดการโดยผู้ดูแล (ยกเลิกใบลา)" if self.is_admin_request else "📌 บันทึกยกเลิกการแจ้งลา"
                     log_color = 0xe67e22 if self.is_admin_request else 0xe74c3c 
@@ -1103,7 +1144,7 @@ class CancelReasonModal(discord.ui.Modal):
                     log_em = discord.Embed(title=log_title, color=log_color)
                     log_em.description = (
                         f"**👤 สมาชิกที่ลา:** {tn}\n\n"
-                        f"{executor_txt}" # แทรก Logic ผู้ดำเนินการตรงนี้ โดยคำอื่นยังอยู่ครบ
+                        f"{executor_txt}"
                         f"**📝 รายละเอียดรายการที่ถูกยกเลิก:**\n"
                         f" • **วันที่ลา:** {dr} `({old_data.get('total_days', 1)} วัน)`\n"
                         f" • **ประเภท:** {old_data.get('leave_category', 'ทั่วไป')}\n"
