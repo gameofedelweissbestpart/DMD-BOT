@@ -547,9 +547,11 @@ class MonthlyUserSelect(discord.ui.Select):
         if not user_leaves:
             em.description += "\n\n🍃 **สมาชิกท่านนี้ไม่มีประวัติการแจ้งลาในเดือนที่เลือก**"
         else:
-            cat_summary = " | ".join([f"{k}: {v} ครั้ง" for k, v in cat_counts.items()])
+            # ปรับการแสดงผลแยกประเภทให้เรียงลงมาทีละบรรทัดด้วย Bullet Dot (•)
+            cat_summary = "\n".join([f"• {k}: `{v}` ครั้ง" for k, v in cat_counts.items()])
+            
             em.description += f"\n📊 **รวมการลาในเดือนนี้:** `{len(user_leaves)}` ครั้ง | รวม `{total_days}` วัน\n"
-            em.description += f"📌 **แยกตามประเภท:** {cat_summary}\n{LONG_SEP}\n\n"
+            em.description += f"📌 **แยกตามประเภท:**\n{cat_summary}\n{LONG_SEP}\n\n"
             
             for idx, item in enumerate(user_leaves, 1):
                 leaf = item["data"]
