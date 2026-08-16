@@ -567,9 +567,9 @@ class MonthlyUserSelect(discord.ui.Select):
                     ex_name = ex_m.display_name if ex_m else f"<@{leaf['user_id']}>"
                     on_behalf = f" *(ผู้แจ้งแทน: {ex_name})*"
 
-                # แก้ไขจาก `[...]` เป็น **[...]** เพื่อตัดระยะ Padding กล่องสีเทาออก ทำให้บรรทัดชิดติดกันสนิท
+                # ใส่ \. หลัง {idx} เพื่อบล็อกไม่ให้ Discord ทำเป็น Markdown List Block
                 em.description += (
-                    f"**{idx}. [{leaf.get('leave_category', 'ทั่วไป')}]**\n"
+                    f"**{idx}\. [{leaf.get('leave_category', 'ทั่วไป')}]**\n"
                     f"┗ 📅 วันที่ลา: {item['dr']} `{day_txt}`\n"
                     f"┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
                 )
