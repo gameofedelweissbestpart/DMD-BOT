@@ -640,11 +640,14 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     else:
         desc += "🍃 **ไม่มีสมาชิกแจ้งลาในเดือนนี้**\n\n"
 
+    # --- [ส่วนที่แก้ไข: จัดการรายชื่อคนไม่เคยลาให้ขึ้นบรรทัดใหม่และเรียงตามลำดับเลข] ---
     if active_list:
-        desc += f"{LONG_SEP}\n**✅ สมาชิกที่ไม่เคยแจ้งลาเลย (จำนวน {len(active_list)} คน):**\n"
-        desc += ", ".join([f"**{name}**" for name in active_list]) + "\n"
+        desc += f"{LONG_SEP}\n**✅ สมาชิกที่ไม่เคยแจ้งลาเลย:**\n"
+        for idx, name in enumerate(active_list, 1):
+            desc += f"`{idx}.` **{name}**\n"
+        desc += "\n"
 
-    desc += f"\n{LONG_SEP}\n*👉 เลือกรายชื่อสมาชิกจาก Dropdown ด้านล่างเพื่อดูประวัติเจาะลึก*"
+    desc += f"{LONG_SEP}\n*👉 เลือกรายชื่อสมาชิกจาก Dropdown ด้านล่างเพื่อดูประวัติเจาะลึก*"
     
     if len(desc) > 4000:
         desc = desc[:3990] + "\n..."
@@ -659,7 +662,6 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
         if data["count"] == 0:
             all_user_opts.append(discord.SelectOption(label=f"{data['member'].display_name} | (ไม่เคยลา)", value=uid, emoji="✅"))
     
-    # 1. เพิ่ม Dropdown สมาชิกทั้งหมดก่อน
     if all_user_opts:
         for start in range(0, len(all_user_opts), 25):
             end = start + 25
@@ -667,7 +669,6 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
             placeholder_text = f"🔍 เลือกสมาชิก (ลำดับที่ {start+1}-{min(end, len(all_user_opts))})..."
             view.add_item(MonthlyUserSelect(guild, year, month, chunk, placeholder_text))
 
-    # 2. เพิ่มปุ่ม "เลือกเดือนใหม่" ต่อท้ายใต้อินพุต Dropdown ทุกอันเสมอ
     view.add_item(ReselectMonthButton())
 
     if not it.response.is_done():
