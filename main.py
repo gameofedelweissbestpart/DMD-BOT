@@ -1054,109 +1054,6 @@ async def daily_report_error(error):
         daily_report_task.restart()
 
 
-    # --- ฟังก์ชันสรุปรายสัปดาห์ (วางต่อจาก daily_report_task หรือก่อน bot.run) ---
-# --- ฟังก์ชันสรุปรายสัปดาห์ (คงคำพูดเดิม / แก้ Logic แยกไฟล์ตาม Guild) ---
-@tasks.loop(minutes=1)
-async def weekly_report_task():
-    n = get_thai_time()
-    
-    # ส่งรายงานทุกวันจันทร์ เวลา 00:10 น.
-    if n.weekday() == 0 and n.hour == 0 and n.minute == 10:
-        # แก้ Logic: วนลูปทุก Guild ที่บอทอยู่เพื่อให้แยกไฟล์กันเด็ดขาด
-        for guild in bot.guilds:
-            gid = str(guild.id)
-            # แก้ Logic: โหลด Config แยกตาม Guild ID
-            cfg = load_data(gid, "config", {})
-            ch_id = cfg.get("weekly_ch", 0)
-            
-            if ch_id:
-                ch = bot.get_channel(int(ch_id))
-                if ch:
-                    # แก้ Logic: โหลดใบลาแยกตาม Guild ID
-                    all_data = load_data(gid, "leaves", [])
-                    start_week = (n - timedelta(days=7)).date()
-                    end_week = (n - timedelta(days=1)).date()
-                    
-                    # กรองสมาชิกตาม Role (คง ID เดิมของคุณ)[cite: 1]
-                    target_role_id = 1456228588968739028
-                    exclude_role_id = 1498319593939144755
-                    gang_members = [m for m in guild.members if any(r.id == target_role_id for r in m.roles) and not any(r.id == exclude_role_id for r in m.roles)]
-
-                    # --- ส่วนประมวลผลข้อมูล (Logic ใหม่แบบแยก Guild) ---
-                    leave_stats = {} 
-                    cat_counts = {}
-
-                    for entry in all_data:
-                        try:
-                            s_d = datetime.strptime(entry['start_date'], "%d/%m/%Y").date()
-                            e_d = datetime.strptime(entry['end_date'], "%d/%m/%Y").date()
-                            if not (e_d < start_week or s_d > end_week):
-                                uid = entry['target_id']
-                                overlap_s = max(s_d, start_week)
-                                overlap_e = min(e_d, end_week)
-                                days = (overlap_e - overlap_s).days + 1
-                                
-                                if uid not in leave_stats:
-                                    leave_stats[uid] = {'days': 0, 'cats': {}}
-                                
-                                leave_stats[uid]['days'] += days
-                                cat = entry.get('leave_category', 'ทั่วไป')
-                                leave_stats[uid]['cats'][cat] = leave_stats[uid]['cats'].get(cat, 0) + 1
-                                cat_counts[cat] = cat_counts.get(cat, 0) + 1
-                        except: continue
-
-                    # --- ส่วนสร้างรายการรายชื่อสมาชิก (คงคำพูดและสัญลักษณ์เดิม) ---[cite: 1]
-                    away_list = []
-                    active_list = []
-                    for m in gang_members:
-                        uid_str = str(m.id)
-                        if uid_str in leave_stats:
-                            st = leave_stats[uid_str]
-                            cats_txt = ", ".join([f"{c} ({v} ครั้ง)" for c, v in st['cats'].items()])
-                            info = (
-                                f"👤 **{m.display_name}** — `{st['days']}` วัน\n"
-                                f" \u17b5 \u17b5 \u17b5 ⤷ **ประเภท:** {cats_txt}" # คงลูกศร ⤷ และ \u17b5[cite: 1]
-                            )
-                            away_list.append(info)
-                        else:
-                            active_list.append(f"👤 **{m.display_name}**")
-
-                    # --- ส่วนสร้าง Embed (คงคำพูดและสัญลักษณ์เดิม) ---[cite: 1]
-                    separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
-                    em = discord.Embed(
-                        title="📋 __รายงานสรุปการลาประจำสัปดาห์__",
-                        description=f"📅 **ช่วงวันที่ {start_week.strftime('%d/%m/%Y')} - {end_week.strftime('%d/%m/%Y')}**\n{separator}",
-                        color=0x2B2D31
-                    )
-
-                    away_text = "\n".join(away_list) if away_list else "ไม่มีสมาชิกแจ้งลา"
-                    # คงสัญลักษณ์ ❎[cite: 1]
-                    em.add_field(name="❎ สมาชิกที่แจ้งลา (สัปดาห์นี้)", value=f"{away_text}\n*(รวม: {len(away_list)} คน)*", inline=False)
-
-                    active_text = "\n".join(active_list) if active_list else "ไม่มีสมาชิก Active"
-                    em.add_field(name="✅ สมาชิกที่ไม่ได้ลาเลย (Active)", value=f"{active_text}\n*(รวม: {len(active_list)} คน)*", inline=False)
-
-                    # สรุปยอดรวมท้ายประกาศ[cite: 1]
-                    total_m = len(gang_members)
-                    active_percent = (len(active_list) / total_m * 100) if total_m > 0 else 0
-                    summary_msg = f"{separator}\n📊 **สรุปยอดรวมทั้งหมด: {total_m} คน**\n"
-                    for c_name, c_num in cat_counts.items():
-                        summary_msg += f"• {c_name}: `{c_num}` ครั้ง\n"
-                    
-                    if cat_counts:
-                        summary_msg += f"\n📈 **สถิติ:** สัปดาห์นี้สมาชิกลา **\"{max(cat_counts, key=cat_counts.get)}\"** มากที่สุด"
-                    summary_msg += f"\n✨ **ความแอคทีฟสัปดาห์นี้: {active_percent:.1f}%**"
-                    
-                    em.add_field(name="\u200b", value=summary_msg, inline=False)
-                    em.set_footer(text=f"ระบบรายงานอัตโนมัติ • {n.strftime('%d/%m/%Y %H:%M น.')}")
-
-                    await ch.send(embed=em)
-
-# --- อย่าลืมเพิ่มการสั่งรัน Task ใน on_ready ---
-# ในฟังก์ชัน on_ready() ของคุณ ให้เพิ่มบรรทัดนี้:
-# if not weekly_report_task.is_running():
-#     weekly_report_task.start()
-
 # --- 6. ระบบยกเลิกใบลา (ฉบับปรับปรุง: ตัดชื่อผู้ดำเนินการตามเงื่อนไขที่คุณย้ำ) ---
 class CancelReasonModal(discord.ui.Modal):
     def __init__(self, target_idx, od, is_admin_request=False): 
@@ -1461,24 +1358,40 @@ class LeaveMainView(discord.ui.View):
     
     @discord.ui.button(label="❌ ยกเลิกการลา", style=discord.ButtonStyle.danger, custom_id="v_l_final_vMaster_DMD_master_3")
     async def l_cn(self, it: discord.Interaction, b: discord.ui.Button):
-        # --- เริ่มการแก้ไข Logic แยกไฟล์ตาม Guild ---
         gid = str(it.guild.id)
-        d = load_data(gid, "leaves", []) # โหลดข้อมูลใบลาของเซิร์ฟเวอร์นี้
+        d = load_data(gid, "leaves", []) # โหลดข้อมูลใบลาของเซิร์ฟเวอร์นี้[cite: 4]
         
-        u_id, now_date, opts = str(it.user.id), get_thai_time().date(), []
+        u_id = str(it.user.id)
+        now_date = get_thai_time().date()
+        opts = []
+        has_blocked_leave = False # ตัวแปรเช็กว่ามีใบลาที่ติดเงื่อนไขโดนบล็อกหรือไม่
         
         for i, e in enumerate(d):
-            # เงื่อนไขเดิม: แสดงเฉพาะใบลาที่ตนเองมีส่วนเกี่ยวข้อง
+            # แสดงเฉพาะใบลาที่ตนเองมีส่วนเกี่ยวข้อง[cite: 4]
             if e['user_id'] == u_id or e['target_id'] == u_id:
                 try:
-                    if datetime.strptime(e['end_date'], "%d/%m/%Y").date() < now_date: continue
-                except: continue
+                    s_date = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
+                    e_date = datetime.strptime(e['end_date'], "%d/%m/%Y").date()
+                    
+                    # กรองใบลาที่หมดอายุย้อนหลังไปแล้วออก
+                    if e_date < now_date: 
+                        continue
+                    
+                    # --- [เงื่อนไขใหม่: บล็อกเฉพาะใบลาหลายวัน ที่เลยวันแรกไปแล้ว (s_date < now_date)] ---
+                    is_multi_day = e['start_date'] != e['end_date']
+                    is_past_first_day = s_date < now_date # วันเริ่มลาน้อยกว่าวันนี้ (เช่น ลาเริ่ม 16 แต่วันนี้วันที่ 17)
+                    
+                    if is_multi_day and is_past_first_day:
+                        has_blocked_leave = True
+                        continue # ข้ามรายการนี้ ไม่นำไปใส่ในตัวเลือกยกเลิก
+                    # -------------------------------------------------------------
+                except: 
+                    continue
                 
                 target_member = it.guild.get_member(int(e['target_id']))
                 tn = target_member.display_name if target_member else e['name']
                 dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
                 
-                # คงคำพูดและ Emoji เดิมของคุณไว้ทั้งหมด
                 opts.append(discord.SelectOption(
                     label=f"{tn} | {dr} ({e.get('total_days', 1)} วัน)",
                     description=f"ประเภท: {e.get('leave_category','ทั่วไป')} | เหตุผล: {e.get('reason','-')[:20]}...",
@@ -1486,7 +1399,15 @@ class LeaveMainView(discord.ui.View):
                 ))
         
         if not opts: 
-            return await it.response.send_message("❌ ไม่พบรายการที่คุณสามารถยกเลิกได้", ephemeral=True)
+            if has_blocked_leave:
+                msg = (
+                    "❌ **ไม่พบรายการที่คุณสามารถยกเลิกได้**\n\n"
+                    "⚠️ *หมายเหตุ: รายการที่ผ่านวันเริ่มลาไปแล้ว ไม่สามารถยกเลิกทั้งใบได้ "
+                    "หากคุณกลับมาก่อนกำหนด กรุณาใช้ปุ่ม **'✏️ แก้ไขวันลา'** เพื่อปรับวันสิ้นสุดแทน*"
+                )
+                return await it.response.send_message(msg, ephemeral=True)
+            else:
+                return await it.response.send_message("❌ ไม่พบรายการที่คุณสามารถยกเลิกได้", ephemeral=True)
             
         await it.response.send_message("📋 เลือกใบลาของคุณที่จะยกเลิก:", view=SubMenuView(it, CancelSelect(opts[:25])), ephemeral=True)
   
