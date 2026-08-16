@@ -640,7 +640,6 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     else:
         desc += "🍃 **ไม่มีสมาชิกแจ้งลาในเดือนนี้**\n\n"
 
-    # --- [ส่วนที่แก้ไข: จัดการรายชื่อคนไม่เคยลาให้ขึ้นบรรทัดใหม่และเรียงตามลำดับเลข] ---
     if active_list:
         desc += f"{LONG_SEP}\n**✅ สมาชิกที่ไม่เคยแจ้งลาเลย:**\n"
         for idx, name in enumerate(active_list, 1):
@@ -672,7 +671,7 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     view.add_item(ReselectMonthButton())
 
     if not it.response.is_done():
-        await it.response.send_message(embed=em, view=view, ephemeral=True)
+        await it.response.edit_message(content=None, embed=em, view=view)
     else:
         await it.edit_original_response(content=None, embed=em, view=view)
 
@@ -708,7 +707,7 @@ async def send_month_selection(it: discord.Interaction):
     
     txt = "📅 **กรุณาเลือกเดือนที่ต้องการดูสรุปประวัติการลา:**"
     if not it.response.is_done():
-        await it.response.send_message(content=txt, embed=None, view=MonthSelectView(opts), ephemeral=True)
+        await it.response.edit_message(content=txt, embed=None, view=MonthSelectView(opts))
     else:
         await it.edit_original_response(content=txt, embed=None, view=MonthSelectView(opts))
 # =====================================================================
