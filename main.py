@@ -1536,7 +1536,7 @@ class DateSelect(discord.ui.Select):
 class LeaveCategorySelect(discord.ui.Select):
     def __init__(self, m_title, s_v, e_v, t_id=None, is_f=False):
         self.m_title, self.s_v, self.e_v, self.t_id, self.is_f = m_title, s_v, e_v, t_id, is_f
-        opts = [discord.SelectOption(label=x, emoji="📝") for x in ["ลาพีคไทม์ (ลาทุกกิจกรรม)", "ลาแอร์ดรอป 21:00 น.", "ลาแอร์ดรอป 00:00 น.", "ลาอีเธอร์ยักษ์", "ลาสกายฟอล", "ลาซ้อม", "ลาอื่นๆ (ระบุในเหตุผล)"]]
+        opts = [discord.SelectOption(label=x, emoji="📝") for x in ["ลาพีคไทม์ (ลาทุกกิจกรรม)", "ลาแอร์ดรอป 21:00", "ลาอีเธอร์ยักษ์ 21:30", "ลาสกายฟอล 22:00", "ลาอีเธอร์ยักษ์ 22:30", "ลาสกายฟอล 23:00", "ลาแอร์ดรอป 00:00", "ลาซ้อม", "ลาอื่นๆ (ระบุในเหตุผล)"]]
         super().__init__(placeholder="📝 เลือกประเภทการลา...", options=opts)
     async def callback(self, it):
         await it.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, self.values[0], self.t_id, self.is_f))
