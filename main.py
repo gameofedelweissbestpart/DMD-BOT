@@ -49,6 +49,51 @@ def validate_date(d_str):
     except:
         return False
 
+# --- รายการประเภทการลา (ตัวแปรกลาง) ---
+LEAVE_CATEGORIES = [
+    "ลาพีคไทม์ (ลาทุกกิจกรรม)",
+    "ลาแอร์ดรอป 21:00",
+    "ลาอีเธอร์ยักษ์ 21:30",
+    "ลาสกายฟอล 22:00",
+    "ลาอีเธอร์ยักษ์ 22:30",
+    "ลาสกายฟอล 23:00",
+    "ลาแอร์ดรอป 00:00",
+    "ลาซ้อม",
+    "ลาอื่นๆ (ระบุในเหตุผล)"
+]
+
+# --- ฟังก์ชันแปลงและย่อชื่อประเภทการลา ---
+def format_categories(cat_input):
+    if isinstance(cat_input, str):
+        cats = [c.strip() for c in cat_input.split(",") if c.strip()]
+    elif isinstance(cat_input, list):
+        cats = cat_input
+    else:
+        cats = ["ทั่วไป"]
+
+    if not cats:
+        return "ทั่วไป"
+
+    if "ลาพีคไทม์ (ลาทุกกิจกรรม)" in cats:
+        return "`ลาพีคไทม์ (ลาทุกกิจกรรม)`"
+
+    short_map = {
+        "ลาแอร์ดรอป 21:00": "แอร์ดรอป 21:00",
+        "ลาอีเธอร์ยักษ์ 21:30": "อีเธอร์ 21:30",
+        "ลาสกายฟอล 22:00": "สกายฟอล 22:00",
+        "ลาอีเธอร์ยักษ์ 22:30": "อีเธอร์ 22:30",
+        "ลาสกายฟอล 23:00": "สกายฟอล 23:00",
+        "ลาแอร์ดรอป 00:00": "แอร์ดรอป 00:00",
+        "ลาซ้อม": "ซ้อม",
+        "ลาอื่นๆ (ระบุในเหตุผล)": "อื่นๆ"
+    }
+
+    if len(cats) > 1:
+        formatted = [f"`{short_map.get(c, c)}`" for c in cats]
+        return ", ".join(formatted)
+    else:
+        return f"`{cats[0]}`"
+
 # --- 2. ระบบตาราง Real-time (แก้ไขให้แยก Guild) ---
 async def update_summary_board(guild):
     gid = str(guild.id)
@@ -93,7 +138,7 @@ async def update_summary_board(guild):
             desc += f" **👤 {display_name}**\n"
             for leaf in leaves:
                 dr = leaf['start_date'] if leaf['start_date'] == leaf['end_date'] else f"{leaf['start_date']} - {leaf['end_date']}"
-                desc += f" \u17b5 \u17b5 \u17b5 \u17b5 • `[{leaf.get('leave_category','ทั่วไป')}]` วันที่: {dr} `(รวม {leaf.get('total_days', 1)} วัน)`\n"
+                cat_str = format_categories(leaf.get('leave_category', 'ทั่วไป'))
                 
                 if leaf['user_id'] != leaf['target_id']:                
                     executor = guild.get_member(int(leaf['user_id']))
@@ -101,9 +146,10 @@ async def update_summary_board(guild):
                     on_behalf = f" **(ผู้แจ้งแทน: {ex_name})**" 
                 else:
                     on_behalf = ""
-                    
-                desc += f" \u17b5 \u17b5 \u17b5 \u17b5 \u17b5 \u17b5 \u17b5 \u17b5 \u17b5 ⤷ **เหตุผล:** {leaf.get('reason', '-')}{on_behalf}\n"
-            desc += "\n"
+
+                desc += f" ⠀⠀• `วันที่:` {dr} `(รวม {leaf.get('total_days', 1)} วัน)`\n"
+                desc += f" ⠀⠀⠀⠀⤷ **ประเภท:** {cat_str}\n"
+                desc += f" ⠀⠀⠀⠀⤷ **เหตุผล:** {leaf.get('reason', '-')}{on_behalf}\n"
 
     # --- ส่วนที่ 2: รายชื่อแจ้งลาล่วงหน้า (ย้ายมาไว้ล่างเส้นคั่น) ---[cite: 4]
     desc += f"{LONG_SEP}\n" 
@@ -222,9 +268,10 @@ class LeaveModal(discord.ui.Modal):
                 on_behalf_txt = f"\n**👮 ผู้แจ้งลาแทน:** {executor_name}" if is_on_behalf else ""
                 dr = s if s == e else f"{s} - {e}"
                 
+                cat_display = format_categories(self.cat_val)
                 log_em.description = (
                     f"**👤 สมาชิกที่ลา:** {target_name}{on_behalf_txt}\n\n"
-                    f"**📝 ประเภท:** {self.cat_val}\n"
+                    f"**📝 ประเภท:** {cat_display}\n"
                     f"**📅 วันที่ลา:** {dr} `(รวม {days} วัน)`\n"
                     f"**💬 เหตุผล:** {self.re.value}\n\n"
                     f"{LONG_SEP}"
@@ -826,27 +873,20 @@ class AdminFinalActionView(discord.ui.View):
 
     @discord.ui.button(label="📝 แก้ไขข้อมูลใบลา", style=discord.ButtonStyle.secondary, custom_id="admin_edit_master_btn")
     async def edit_details(self, it: discord.Interaction, b: discord.ui.Button):
-        # คงรายการประเภทการลาเดิมของคุณไว้ทั้งหมด
-        categories = ["ลาพีคไทม์ (ลาทุกกิจกรรม)", "ลาแอร์ดรอป 21:00", "ลาอีเธอร์ยักษ์ 21:30", "ลาสกายฟอล 22:00", "ลาอีเธอร์ยักษ์ 22:30", "ลาสกายฟอล 23:00", "ลาแอร์ดรอป 00:00", "ลาซ้อม", "ลาอื่นๆ (ระบุในเหตุผล)"]
-        opts = [discord.SelectOption(label=f"คงประเภทเดิม: {self.od.get('leave_category', 'ทั่วไป')}", value="KEEP_OLD", emoji="📌")]
-        for cat in categories:
-            opts.append(discord.SelectOption(label=cat, value=cat, emoji="📝"))
+        opts = [discord.SelectOption(label=cat, value=cat, emoji="📝") for cat in LEAVE_CATEGORIES]
             
-        # คงคำพูดเดิมของคุณไว้ 100%
         await it.response.edit_message(
-            content="🎯 **ขั้นตอนที่ 1:** เลือกประเภทการลาที่ต้องการ (หรือใช้ค่าเดิม)", 
+            content="🎯 **ขั้นตอนที่ 1:** เลือกประเภทการลาที่ต้องการ (เลือกได้หลายอัน)", 
             embed=None, 
             view=AdminEditCategoryView(self.idx, self.od, opts)
         )
 
     @discord.ui.button(label="🛑 ยกเลิกใบลานี้", style=discord.ButtonStyle.danger, custom_id="admin_cancel_leave_btn")
     async def cancel(self, it: discord.Interaction, b: discord.ui.Button):
-        # ส่งค่า True เพื่อบอกว่าเป็นรายการจากแอดมิน และส่งต่อข้อมูลไปยัง Modal
         await it.response.send_modal(CancelReasonModal(self.idx, self.od, is_admin_request=True))
 
     @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, custom_id="admin_back_to_select_leave_btn", row=1)
     async def back(self, it: discord.Interaction, b: discord.ui.Button):
-        # ย้อนกลับไปหน้าจัดการหลัก ซึ่งใน AdminLeaveManagementView เราได้แก้ Logic แยกไฟล์ไว้แล้ว[cite: 1]
         await it.response.edit_message(
             content="🛠 **แอดมินจัดการใบลา:** เลือกรายการที่ต้องการจัดการอีกครั้ง:", 
             embed=None, 
@@ -871,15 +911,22 @@ class AdminEditCategoryView(discord.ui.View):
 
 class AdminEditCategorySelect(discord.ui.Select):
     def __init__(self, idx, od, opts):
-        # คง placeholder เดิม
-        super().__init__(placeholder="🔍 เลือกประเภทการลาใหม่...", options=opts, custom_id="admin_category_select_dropdown")
+        super().__init__(
+            placeholder="🔍 เลือกประเภทการลาใหม่ (เลือกได้หลายอัน)...", 
+            min_values=1,
+            max_values=len(opts),
+            options=opts, 
+            custom_id="admin_category_select_dropdown"
+        )
         self.idx, self.od = idx, od
     
     async def callback(self, it: discord.Interaction):
-        # คง Logic การเลือกประเภท (เดิมหรือใหม่) ตามที่คุณเขียนไว้
-        final_cat = self.od.get('leave_category', 'ทั่วไป') if self.values[0] == "KEEP_OLD" else self.values[0]
+        selected_cats = self.values
+        if "ลาพีคไทม์ (ลาทุกกิจกรรม)" in selected_cats:
+            final_cat = ["ลาพีคไทม์ (ลาทุกกิจกรรม)"]
+        else:
+            final_cat = selected_cats
         
-        # ส่งต่อไปยัง Modal แก้ไขรายละเอียด (ซึ่งเราได้แก้ Logic แยกไฟล์ไว้แล้วในขั้นตอนก่อนหน้า)[cite: 1]
         await it.response.send_modal(AdminEditDetailsModal(self.idx, self.od, final_cat))
 
 # --- แก้ไข Logic ใน AdminEditDetailsModal (คำเดิม 100% + เพิ่มเงื่อนไข (คงเดิม)) ---
@@ -1038,7 +1085,7 @@ async def daily_report_task():
                     separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
                     desc_content = f"📅 **ของวันที่ {target_date_str}**\n{separator}\n\n"
 
-                    # แสดงส่วนที่ 1: รายชื่อคนลาปกติ
+                    # แสดงส่วนที่ 1: รายชื่อคนลาปกติ (ไม่มีวันที่ซ้ำ)
                     if not daily_grouped:
                         desc_content += "🍃 **เมื่อวานนี้ไม่มีสมาชิกแจ้งลาในระบบ**\n\n"
                     else:
@@ -1047,25 +1094,28 @@ async def daily_report_task():
                             target_name = member.display_name if member else tid
                             desc_content += f"👤 **{target_name}**\n"
                             for leaf in leaves:
-                                desc_content += f" ┗ ` {leaf.get('leave_category','ทั่วไป')} `\n"
-                                desc_content += f" \u17b5 \u17b5 \u17b5 └ **เหตุผล:** {leaf['reason']}\n"
+                                c_disp = format_categories(leaf.get('leave_category', 'ทั่วไป'))
+                                desc_content += f" ⠀⠀⠀⠀⤷ **ประเภท:** {c_disp}\n"
+                                desc_content += f" ⠀⠀⠀⠀⤷ **เหตุผล:** {leaf['reason']}\n"
                             desc_content += "\n"
 
-                    # แสดงส่วนที่ 2: รายชื่อคนที่กดยกเลิกใบลาในวันนั้น
+                    # แสดงส่วนที่ 2: รายชื่อคนที่กดยกเลิกใบลาในวันนั้น (มีวันที่เดิม)
                     desc_content += f"{separator}\n"
                     if cancelled_today:
                         desc_content += "**🚫 รายการใบลาที่ถูกยกเลิกในวันนี้:**\n\n"
                         for c in cancelled_today:
                             target_m = guild.get_member(int(c['target_id']))
                             t_name = target_m.display_name if target_m else c.get('name', 'Unknown')
-                            c_time = c['cancelled_at'].split()[1][:5] # ดึงเฉพาะ HH:mm
+                            c_time = c['cancelled_at'].split()[1][:5]
                             
                             admin_tag = " (Admin)" if c.get('is_admin_cancel') else ""
                             by_txt = f" (ผู้ยกเลิก: {c.get('cancelled_by_name', '-')}{admin_tag})" if c['cancelled_by'] != c['target_id'] else ""
 
+                            c_cat = format_categories(c.get('leave_category', 'ทั่วไป'))
                             desc_content += f"👤 **{t_name}** `[ยกเลิกเมื่อ {c_time} น.]{by_txt}`\n"
-                            desc_content += f" ┗ 📅 เดิมลา: {c['start_date']} - {c['end_date']} `({c.get('leave_category','ทั่วไป')})`\n"
-                            desc_content += f" \u17b5 \u17b5 \u17b5 └ **เหตุผลยกเลิก:** {c.get('cancel_reason', '-')}\n\n"
+                            desc_content += f" ⠀⠀• `เดิมลาวันที่:` {c['start_date']} - {c['end_date']}\n"
+                            desc_content += f" ⠀⠀⠀⠀⤷ **ประเภท:** {c_cat}\n"
+                            desc_content += f" ⠀⠀⠀⠀⤷ **เหตุผลยกเลิก:** {c.get('cancel_reason', '-')}\n\n"
                     else:
                         desc_content += "🍃 **ไม่มีรายการยกเลิกใบลาในวันนี้**\n\n"
 
@@ -1450,9 +1500,11 @@ class LeaveMainView(discord.ui.View):
                 tn = target_member.display_name if target_member else e['name']
                 dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
                 
+                # 🟢 แก้ไข 2 บรรทัดนี้ (เรียกใช้ format_categories):
+                cat_txt = format_categories(e.get('leave_category', 'ทั่วไป'))
                 opts.append(discord.SelectOption(
                     label=f"{tn} | {dr} ({e.get('total_days', 1)} วัน)",
-                    description=f"ประเภท: {e.get('leave_category','ทั่วไป')} | เหตุผล: {e.get('reason','-')[:20]}...",
+                    description=f"ประเภท: {cat_txt[:20]} | เหตุผล: {e.get('reason','-')[:15]}",
                     value=str(i)
                 ))
         
@@ -1489,9 +1541,11 @@ class LeaveMainView(discord.ui.View):
                 dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
                 
                 # คงคำพูดและ Emoji เดิมของคุณไว้ทั้งหมด[cite: 1]
+                # 🟢 แก้ไข 2 บรรทัดนี้ (เรียกใช้ format_categories):
+                cat_txt = format_categories(e.get('leave_category', 'ทั่วไป'))
                 opts.append(discord.SelectOption(
                     label=f"{tn} | {dr} ({e.get('total_days', 1)} วัน)",
-                    description=f"ประเภท: {e.get('leave_category','ทั่วไป')} | เหตุผล: {e.get('reason','-')[:20]}...",
+                    description=f"ประเภท: {cat_txt[:20]} | เหตุผล: {e.get('reason','-')[:15]}",
                     value=str(i)
                 ))
         
@@ -1536,10 +1590,23 @@ class DateSelect(discord.ui.Select):
 class LeaveCategorySelect(discord.ui.Select):
     def __init__(self, m_title, s_v, e_v, t_id=None, is_f=False):
         self.m_title, self.s_v, self.e_v, self.t_id, self.is_f = m_title, s_v, e_v, t_id, is_f
-        opts = [discord.SelectOption(label=x, emoji="📝") for x in ["ลาพีคไทม์ (ลาทุกกิจกรรม)", "ลาแอร์ดรอป 21:00", "ลาอีเธอร์ยักษ์ 21:30", "ลาสกายฟอล 22:00", "ลาอีเธอร์ยักษ์ 22:30", "ลาสกายฟอล 23:00", "ลาแอร์ดรอป 00:00", "ลาซ้อม", "ลาอื่นๆ (ระบุในเหตุผล)"]]
-        super().__init__(placeholder="📝 เลือกประเภทการลา...", options=opts)
-    async def callback(self, it):
-        await it.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, self.values[0], self.t_id, self.is_f))
+        opts = [discord.SelectOption(label=x, emoji="📝") for x in LEAVE_CATEGORIES]
+        
+        super().__init__(
+            placeholder="📝 เลือกประเภทการลา (เลือกได้หลายอัน)...", 
+            min_values=1, 
+            max_values=len(opts), 
+            options=opts
+        )
+        
+    async def callback(self, it: discord.Interaction):
+        selected_cats = self.values
+        if "ลาพีคไทม์ (ลาทุกกิจกรรม)" in selected_cats:
+            final_cat = ["ลาพีคไทม์ (ลาทุกกิจกรรม)"]
+        else:
+            final_cat = selected_cats
+
+        await it.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, final_cat, self.t_id, self.is_f))
         try:
             await it.delete_original_response()
         except:
