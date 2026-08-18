@@ -827,7 +827,7 @@ class AdminFinalActionView(discord.ui.View):
     @discord.ui.button(label="📝 แก้ไขข้อมูลใบลา", style=discord.ButtonStyle.secondary, custom_id="admin_edit_master_btn")
     async def edit_details(self, it: discord.Interaction, b: discord.ui.Button):
         # คงรายการประเภทการลาเดิมของคุณไว้ทั้งหมด
-        categories = ["ลาพีคไทม์ (ลาทุกกิจกรรม)", "ลาแอร์ดรอป 21:00 น.", "ลาแอร์ดรอป 00:00 น.", "ลาอีเธอร์ยักษ์", "ลาสกายฟอล", "ลาซ้อม", "ลาอื่นๆ (ระบุในเหตุผล)"]
+        categories = ["ลาพีคไทม์ (ลาทุกกิจกรรม)", "ลาแอร์ดรอป 21:00", "ลาอีเธอร์ยักษ์ 21:30", "ลาสกายฟอล 22:00", "ลาอีเธอร์ยักษ์ 22:30", "ลาสกายฟอล 23:00", "ลาแอร์ดรอป 00:00", "ลาซ้อม", "ลาอื่นๆ (ระบุในเหตุผล)"]
         opts = [discord.SelectOption(label=f"คงประเภทเดิม: {self.od.get('leave_category', 'ทั่วไป')}", value="KEEP_OLD", emoji="📌")]
         for cat in categories:
             opts.append(discord.SelectOption(label=cat, value=cat, emoji="📝"))
