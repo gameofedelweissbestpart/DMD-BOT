@@ -1092,12 +1092,13 @@ class AdminEditDetailsModal(discord.ui.Modal):
 # --- 5. งานรายวัน (ฉบับแก้ไข Syntax + นับจำนวนคนแบบ Unique) ---
 # --- ฟังก์ชันสรุปรายวัน (คงคำพูดเดิม 100% / แก้ Logic แยกไฟล์ตาม Guild) ---
 # --- 5. งานรายวัน (ฉบับแก้ไขเวลา 00:05 น. สรุปของเมื่อวาน + ป้องกันข้อความยาวเกิน) ---
+# --- 5. งานรายวัน (ฉบับแก้ไขนับสถิติจำนวนคน และแยกนับทุกประเภทการลา 100%) ---
 @tasks.loop(minutes=1)
 async def daily_report_task():
     n = get_thai_time()
     
     # ส่งรายงานเวลา 00:05 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
-    if n.hour == 0 and n.minute == 5:
+    if n.hour == 0 and n.minute == 40:
         for guild in bot.guilds:
             gid = str(guild.id)
             cfg = load_data(gid, "config", {})
@@ -1125,8 +1126,17 @@ async def daily_report_task():
                                     daily_grouped[tid] = []
                                 daily_grouped[tid].append(e)
                                 
-                                cat = e.get('leave_category', 'ทั่วไป')
-                                cat_counts[cat] = cat_counts.get(cat, 0) + 1
+                                # 🟢 แก้ไข Logic การดึงและแยกนับประเภทการลา (แตกนับได้ทั้ง List และ String)
+                                raw_cat = e.get('leave_category', 'ทั่วไป')
+                                if isinstance(raw_cat, list):
+                                    cats = raw_cat
+                                elif isinstance(raw_cat, str):
+                                    cats = [c.strip() for c in raw_cat.split(",") if c.strip()]
+                                else:
+                                    cats = ["ทั่วไป"]
+
+                                for c in cats:
+                                    cat_counts[c] = cat_counts.get(c, 0) + 1
                         except:
                             continue
 
@@ -1143,7 +1153,7 @@ async def daily_report_task():
                     separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
                     desc_content = f"📅 **ของวันที่ {target_date_str}**\n{separator}\n\n"
 
-                    # แสดงส่วนที่ 1: รายชื่อคนลาปกติ (ไม่มีวันที่ซ้ำ)
+                    # แสดงส่วนที่ 1: รายชื่อคนลาปกติ
                     if not daily_grouped:
                         desc_content += "🍃 **เมื่อวานนี้ไม่มีสมาชิกแจ้งลาในระบบ**\n\n"
                     else:
@@ -1157,7 +1167,7 @@ async def daily_report_task():
                                 desc_content += f" ⠀⠀⠀⠀⤷ **เหตุผล:** {leaf['reason']}\n"
                             desc_content += "\n"
 
-                    # แสดงส่วนที่ 2: รายชื่อคนที่กดยกเลิกใบลาในวันนั้น (มีวันที่เดิม)
+                    # แสดงส่วนที่ 2: รายชื่อคนที่กดยกเลิกใบลาในวันนั้น
                     desc_content += f"{separator}\n"
                     if cancelled_today:
                         desc_content += "**🚫 รายการใบลาที่ถูกยกเลิกในวันนี้:**\n\n"
