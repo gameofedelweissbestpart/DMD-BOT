@@ -1098,7 +1098,7 @@ async def daily_report_task():
     n = get_thai_time()
     
     # ส่งรายงานเวลา 00:05 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
-    if n.hour == 0 and n.minute == 40:
+    if n.hour == 0 and n.minute == 50:
         for guild in bot.guilds:
             gid = str(guild.id)
             cfg = load_data(gid, "config", {})
@@ -1151,7 +1151,7 @@ async def daily_report_task():
                             continue
 
                     separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
-                    desc_content = f"📅 **ของวันที่ {target_date_str}**\n{separator}\n\n"
+                    desc_content = f"## 📅 ของวันที่ {target_date_str}\n{separator}\n\n"
 
                     # แสดงส่วนที่ 1: รายชื่อคนลาปกติ
                     if not daily_grouped:
@@ -1191,13 +1191,13 @@ async def daily_report_task():
                         desc_content = desc_content[:3990] + "\n... (รายการส่วนที่เหลือถูกตัดเนื่องจากยาวเกินไป)"
 
                     em = discord.Embed(
-                        title="📋 __รายงานสรุปการลาประจำวัน__",
+                        title="## 📋 __รายงานสรุปการลาประจำวัน__",
                         description=desc_content,
                         color=0x2B2D31
                     )
                     
                     summary_msg = f"{separator}\n"
-                    summary_msg += f"📊 **สรุปจำนวนคนลาวันนี้: {len(daily_grouped)} คน** | **ยกเลิก: {len(cancelled_today)} รายการ**\n"
+                    summary_msg += f"📊 **สรุปจำนวนคนลาวันนี้: `{len(daily_grouped)}` คน** | **ยกเลิก: `{len(cancelled_today)}` รายการ**\n\n"
                     for cat_name, count in cat_counts.items():
                         summary_msg += f"• {cat_name}: `{count}` ครั้ง\n"
                     
