@@ -147,9 +147,13 @@ async def update_summary_board(guild):
                 else:
                     on_behalf = ""
 
-                desc += f" ⠀⠀• `วันที่:` {dr} `(รวม {leaf.get('total_days', 1)} วัน)`\n"
+                # 🟢 ปรับเฉพาะจุดนี้: เอาเฉพาะคำว่า วันที่: และช่วงวัน ออกจากกล่องเทา ส่วน (รวม X วัน) ใส่กล่องเทาไว้ตามสั่ง
+                desc += f" ⠀⠀• วันที่: {dr} `(รวม {leaf.get('total_days', 1)} วัน)`\n"
                 desc += f" ⠀⠀⠀⠀⤷ **ประเภท:** {cat_str}\n"
                 desc += f" ⠀⠀⠀⠀⤷ **เหตุผล:** {leaf.get('reason', '-')}{on_behalf}\n"
+            
+            # 🟢 เว้นระยะห่างก่อนขึ้นชื่อคนถัดไป
+            desc += "\n"
 
     # --- ส่วนที่ 2: รายชื่อแจ้งลาล่วงหน้า (ย้ายมาไว้ล่างเส้นคั่น) ---[cite: 4]
     desc += f"{LONG_SEP}\n" 
@@ -577,8 +581,14 @@ class MonthlyUserSelect(discord.ui.Select):
                         days = (overlap_e - overlap_s).days + 1
                         
                         total_days += days
-                        cat = e.get('leave_category', 'ทั่วไป')
-                        cat_counts[cat] = cat_counts.get(cat, 0) + 1
+                        
+                        # 🟢 รองรับการนับสถิติประเภททั้งแบบข้อความเดี่ยว (str) และหลายประเภท (list)
+                        raw_cat = e.get('leave_category', 'ทั่วไป')
+                        if isinstance(raw_cat, list):
+                            for c in raw_cat:
+                                cat_counts[c] = cat_counts.get(c, 0) + 1
+                        else:
+                            cat_counts[raw_cat] = cat_counts.get(raw_cat, 0) + 1
                         
                         user_leaves.append({
                             "data": e,
@@ -617,8 +627,10 @@ class MonthlyUserSelect(discord.ui.Select):
                     on_behalf = f" *(ผู้แจ้งแทน: {ex_name})*"
 
                 # ใส่ \. หลัง {idx} เพื่อบล็อกไม่ให้ Discord ทำเป็น Markdown List Block
+                # 🟢 แปลงประเภทการลาเป็นย่อสีเทาผ่าน format_categories
+                cat_disp_item = format_categories(leaf.get('leave_category', 'ทั่วไป'))
                 em.description += (
-                    f"**{idx}\. [{leaf.get('leave_category', 'ทั่วไป')}]**\n"
+                    f"**{idx}\. [{cat_disp_item}]**\n"
                     f"┗ 📅 วันที่ลา: {item['dr']} `{day_txt}`\n"
                     f"┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
                 )
@@ -1592,6 +1604,7 @@ class LeaveCategorySelect(discord.ui.Select):
         self.m_title, self.s_v, self.e_v, self.t_id, self.is_f = m_title, s_v, e_v, t_id, is_f
         opts = [discord.SelectOption(label=x, emoji="📝") for x in LEAVE_CATEGORIES]
         
+        # 🟢 เปิด Multi-select ให้เลือกได้หลายประเภท (ใช้ได้ทั้งลาเอง และ ลาแทนเพื่อน)
         super().__init__(
             placeholder="📝 เลือกประเภทการลา (เลือกได้หลายอัน)...", 
             min_values=1, 
@@ -1601,11 +1614,13 @@ class LeaveCategorySelect(discord.ui.Select):
         
     async def callback(self, it: discord.Interaction):
         selected_cats = self.values
+        # 🟢 หากเลือก "ลาพีคไทม์" ร่วมกับกิจกรรมอื่น ให้ตัดเหลือแค่ "ลาพีคไทม์"
         if "ลาพีคไทม์ (ลาทุกกิจกรรม)" in selected_cats:
             final_cat = ["ลาพีคไทม์ (ลาทุกกิจกรรม)"]
         else:
             final_cat = selected_cats
 
+        # 🟢 ส่งค่า final_cat (ที่เป็น list) และ t_id (ID เพื่อน) ไปยัง LeaveModal
         await it.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, final_cat, self.t_id, self.is_f))
         try:
             await it.delete_original_response()
