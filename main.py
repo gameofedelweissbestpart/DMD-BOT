@@ -1098,7 +1098,7 @@ async def daily_report_task():
     n = get_thai_time()
     
     # ส่งรายงานเวลา 00:05 น. ของทุกวัน (ดึงข้อมูลสรุปของเมื่อวาน)
-    if n.hour == 1 and n.minute == 5:
+    if n.hour == 1 and n.minute == 13:
         for guild in bot.guilds:
             gid = str(guild.id)
             cfg = load_data(gid, "config", {})
@@ -1152,7 +1152,7 @@ async def daily_report_task():
 
                     separator = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
                     # 🟢 ใส่หัวข้อใหญ่ไว้บรรทัดแรกสุดของ desc_content ได้เลย
-                    desc_content = f"## 📋 __รายงานสรุปการลาประจำวัน__\n📅 ***ของวันที่ {target_date_str}**\n{separator}\n\n"
+                    desc_content = f"## 📋 __รายงานสรุปการลาประจำวัน__\n### 📅 ของวันที่ {target_date_str}\n{separator}\n\n"
 
                     # แสดงส่วนที่ 1: รายชื่อคนลาปกติ
                     if not daily_grouped:
