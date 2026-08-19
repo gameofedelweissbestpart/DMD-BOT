@@ -654,8 +654,24 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     gid = str(guild.id)
     leaves = load_data(gid, "leaves", [])
     
+    now_dt = get_thai_time()
+    now_date = now_dt.date()
+    
     m_start = datetime(year, month, 1).date()
-    m_end = datetime(year, month, calendar.monthrange(year, month)[1]).date()
+    last_day = calendar.monthrange(year, month)[1]
+    m_end = datetime(year, month, last_day).date()
+
+    # --- 🟢 Logic คำนวณช่วงวันที่และเวลาอัปเดตสำหรับ Embed ---
+    if year == now_date.year and month == now_date.month:
+        # กรณีเดือนปัจจุบัน (ยังไม่จบเดือน)
+        date_range_txt = f"01/{month:02d}/{year} - {now_date.strftime('%d/%m/%Y')}"
+        info_label = "📌 **ข้อมูล ณ วันที่:**"
+    else:
+        # กรณีเดือนในอดีต (จบเดือนแล้ว)
+        date_range_txt = f"01/{month:02d}/{year} - {last_day:02d}/{month:02d}/{year}"
+        info_label = "📌 **ข้อมูลทั้งเดือน:**"
+        
+    update_time_txt = f"🕒 **อัปเดตล่าสุด:** {now_dt.strftime('%d/%m/%Y เวลา %H:%M น.')}"
 
     target_role_id = 1456228588968739028
     exclude_role_id = 1498319593939144755
@@ -694,7 +710,14 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     leaved_list.sort(key=lambda x: (x[2], x[3]), reverse=True)
 
     month_name = f"{THAI_MONTHS[month-1]} {year}"
-    desc = f"# 📊 สรุปประวัติการลาประจำเดือน {month_name}\n{LONG_SEP}\n\n"
+    
+    # 🟢 ประกอบข้อความส่วนหัวใหม่ (แยกบรรทัดโปร่งสบาย สวยงาม)
+    desc = (
+        f"## 📊 สรุปประวัติการลาประจำเดือน {month_name}\n"
+        f"{info_label} {date_range_txt}\n"
+        f"{update_time_txt}\n"
+        f"{LONG_SEP}\n\n"
+    )
 
     if leaved_list:
         desc += "**❎ สมาชิกที่มีประวัติการลา:**\n"
