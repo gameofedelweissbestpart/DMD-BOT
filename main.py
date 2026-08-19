@@ -84,8 +84,7 @@ def format_categories(cat_input):
         "ลาอีเธอร์ยักษ์ 22:30": "อีเธอร์ 22:30",
         "ลาสกายฟอล 23:00": "สกายฟอล 23:00",
         "ลาแอร์ดรอป 00:00": "แอร์ดรอป 00:00",
-        "ลาซ้อม": "ซ้อม",
-        "ลาอื่นๆ (ระบุในเหตุผล)": "อื่นๆ"
+        "ลาอื่นๆ (ระบุในเหตุผล)": "อื่นๆ (ระบุในเหตุผล)"
     }
 
     if len(cats) > 1:
@@ -430,13 +429,13 @@ class AdminSubMenuView(discord.ui.View):
                 description=(
                     "# __📋 ระบบการแจ้งลาแก๊ง Dark Monday__\n"
                     "กรุณากดปุ่มด้านล่างเพื่อทำรายการที่ท่านต้องการได้เลยครับ\n\n"
-                    "**⚠️ __หมายเหตุสำคัญ__ ⚠️**\n"
+                    "### ⚠️ __หมายเหตุสำคัญ__ ⚠️\n"
                     "- การระบุวันที่ในระบบให้ใช้ปี **ค.ศ.** เท่านั้น (เช่น 28/04/2026)\n"
                     "- สมาชิกสามารถแจ้งลาได้สูงสุดไม่เกิน **15 วัน** ต่อการแจ้ง 1 ครั้ง\n"
                     "- ระบุเหตุผลการลาให้ชัดเจน (เช่น ติด OC, ธุระทางบ้าน, ลาป่วย)\n"
                     "- ระบบไม่อนุญาตให้ลาย้อนหลัง หากมีเหตุฉุกเฉินให้แจ้งแอดมินโดยตรง\n"
                     "- โปรดตรวจสอบข้อมูลให้ถูกต้อง การแจ้งลาเท็จจะมีบทลงโทษตามกฎแก๊ง\n\n"
-                    "**🆘__รายละเอียดค่าปรับ__🆘**\n"
+                    "### 🆘 __รายละเอียดค่าปรับ__ 🆘\n"
                     "- แจ้งลาก่อน 21:00 น. → ไม่มีค่าปรับ\n"
                     "- แจ้งลาหลัง 21:00 น. → ค่าปรับ 500K\n"
                     "- ไม่แจ้งลา / หาย → ค่าปรับ 1M"
@@ -997,8 +996,10 @@ class AdminEditDetailsModal(discord.ui.Modal):
             else:
                 date_txt = f"`{old_s}-{old_e}` ➔ **`{new_s}-{new_e}`**"
 
-            # 2. ประเภทการลา
-            cat_txt = f"`{old_cat}` (คงเดิม)" if old_cat == self.selected_cat else f"`{old_cat}` ➔ **`{self.selected_cat}`**"
+            # 2. ประเภทการลา (ใช้ format_categories แปลงให้เป็นกล่องสีเทาสวยงาม)
+            old_cat_str = format_categories(old_cat)
+            new_cat_str = format_categories(self.selected_cat)
+            cat_txt = f"{old_cat_str} (คงเดิม)" if old_cat == self.selected_cat else f"{old_cat_str} ➔ **{new_cat_str}**"
             
             # 3. จำนวนวัน
             days_txt = f"`{old_days}` วัน (คงเดิม)" if old_days == new_days else f"`{old_days}` ➔ **`{new_days}` วัน**"
@@ -1601,7 +1602,7 @@ class DateSelect(discord.ui.Select):
         if val == "t": title, s, e, is_fixed = "ลาวันนี้", now.strftime("%d/%m/%Y"), now.strftime("%d/%m/%Y"), True
         elif val == "tm": title, s, e, is_fixed = "ลาพรุ่งนี้", (now + timedelta(days=1)).strftime("%d/%m/%Y"), (now + timedelta(days=1)).strftime("%d/%m/%Y"), True
         else: title, s, e, is_fixed = "ลาแบบระบุวันเอง", "", "", False
-        await it.response.edit_message(content=f"✅ เลือกช่วงเวลา: **{title}**\n👉 กรุณาเลือกประเภทการลาด้านล่าง:", view=LeaveCategoryView(title, s, e, self.t_id, is_f=is_fixed))
+        await it.response.edit_message(content=f"✅ เลือกช่วงเวลา: **{title}**\n👉 กรุณาเลือกประเภทการลาด้านล่าง:\n 🔴 เลือกได้มากกว่า1ประเภท", view=LeaveCategoryView(title, s, e, self.t_id, is_f=is_fixed))
 
 class LeaveCategorySelect(discord.ui.Select):
     def __init__(self):
