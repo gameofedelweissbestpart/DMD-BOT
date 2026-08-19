@@ -535,9 +535,10 @@ class ReselectMonthButton(discord.ui.Button):
     async def callback(self, it: discord.Interaction):
         await send_month_selection(it)
 
+# 🟢 2. อัปเดตคลาส MonthlyDetailView (เพิ่มปุ่มปิดเมนูเรียงต่อด้านขวา)
 class MonthlyDetailView(discord.ui.View):
     def __init__(self, guild, year, month):
-        super().__init__(timeout=600)  # ขยายเวลาเป็น 10 นาที (600 วินาที)
+        super().__init__(timeout=600)
         self.guild = guild
         self.year = year
         self.month = month
@@ -549,6 +550,12 @@ class MonthlyDetailView(discord.ui.View):
     @discord.ui.button(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary)
     async def reselect_month(self, it: discord.Interaction, b: discord.ui.Button):
         await send_month_selection(it)
+
+    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger)
+    async def close_menu(self, it: discord.Interaction, b: discord.ui.Button):
+        await it.response.defer()
+        try: await it.delete_original_response()
+        except: pass
 
 class MonthlyUserSelect(discord.ui.Select):
     def __init__(self, guild, year, month, opts, placeholder_str="🔍 เลือกสมาชิกที่ต้องการดูประวัติเจาะลึก..."):
@@ -643,12 +650,22 @@ class MonthlyUserSelect(discord.ui.Select):
         
         await it.edit_original_response(embed=em, view=MonthlyDetailView(self.guild_obj, self.year, self.month))
 
+# 🟢 1. อัปเดตคลาส MonthlyOverviewView (เพิ่มปุ่มปิดเมนู)
 class MonthlyOverviewView(discord.ui.View):
     def __init__(self, guild, year, month):
-        super().__init__(timeout=600)  # ขยายเวลาเป็น 10 นาที (600 วินาที)
+        super().__init__(timeout=600)
         self.guild = guild
         self.year = year
         self.month = month
+
+        # เพิ่มปุ่มปิดเมนูไว้ท้ายสุด
+        close_btn = discord.ui.Button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
+        async def close_callback(it: discord.Interaction):
+            await it.response.defer()
+            try: await it.delete_original_response()
+            except: pass
+        close_btn.callback = close_callback
+        self.add_item(close_btn)
 
 async def generate_and_send_monthly_overview(it: discord.Interaction, guild, year, month):
     gid = str(guild.id)
@@ -933,7 +950,7 @@ class AdminFinalActionView(discord.ui.View):
 
 class AdminEditCategoryView(discord.ui.View):
     def __init__(self, idx, od, opts):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         self.idx, self.od = idx, od
         self.add_item(AdminEditCategorySelect(idx, od, opts))
 
@@ -1269,7 +1286,7 @@ class CancelReasonModal(discord.ui.Modal):
 
 class ConfirmCancelView(discord.ui.View):
     def __init__(self, target_idx, od):
-        super().__init__(timeout=60)
+        super().__init__(timeout=300)
         self.target_idx, self.od = target_idx, od
 
     @discord.ui.button(label="✅ ยืนยันการยกเลิก", style=discord.ButtonStyle.success)
@@ -1369,7 +1386,7 @@ class EditReasonModal(discord.ui.Modal):
 
 class EditRetryView(discord.ui.View):
     def __init__(self, idx, od, p_it):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         self.idx, self.od, self.p_it = idx, od, p_it
 
     @discord.ui.button(label="📝 แก้ไขวันที่อีกครั้ง", style=discord.ButtonStyle.primary)
@@ -1431,7 +1448,7 @@ class EditDateModal(discord.ui.Modal):
 
 class ConfirmEditView(discord.ui.View):
     def __init__(self, idx, od, new_end):
-        super().__init__(timeout=60)
+        super().__init__(timeout=300)
         self.idx, self.od, self.new_end = idx, od, new_end
 
     @discord.ui.button(label="✅ ยืนยันการแก้ไข", style=discord.ButtonStyle.success)
