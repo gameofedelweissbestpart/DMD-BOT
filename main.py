@@ -1034,7 +1034,7 @@ class AdminEditDetailsModal(discord.ui.Modal):
                         f"**👮 ผู้ดำเนินการ:** {it.user.display_name} (Admin)\n\n"
                         f"**🔄 รายละเอียดการเปลี่ยนแปลง:**\n"
                         f"• **วันที่ลา:** {date_txt}\n"
-                        f"• **ประเภทการลา:** {cat_txt}\n"
+                        f"• **ประเภท:** {cat_txt}\n"
                         f"• **จำนวนวัน:** {days_txt}\n"
                         f"• **เหตุผล:** {reason_txt}\n\n"
                         f"**🛑 หมายเหตุจากแอดมิน:** {admin_note}\n\n"
@@ -1475,7 +1475,7 @@ class LeaveMainView(discord.ui.View):
         
     @discord.ui.button(label="📝 แจ้งลา", style=discord.ButtonStyle.success, custom_id="v_l_final_vMaster_DMD_master_1")
     async def l_me(self, it, b):
-        await it.response.send_message("🤔 ลาช่วงไหน:", view=SubMenuView(it, DateSelect()), ephemeral=True)
+        await it.response.send_message("🤔 **ลาช่วงไหน:**", view=DateSelectView(), ephemeral=True)
 
     @discord.ui.button(label="👥 ลาแทนเพื่อน", style=discord.ButtonStyle.primary, custom_id="v_l_final_vMaster_DMD_master_2")
     async def l_fr(self, it, b):
@@ -1576,7 +1576,35 @@ class FriendSelect(discord.ui.UserSelect):
     def __init__(self):
         super().__init__(placeholder="👤 เลือกเพื่อน...", min_values=1, max_values=1)
     async def callback(self, it):
-        await it.response.edit_message(content=f"🎯 ลาแทนคุณ: {self.values[0].mention}", view=SubMenuView(it, DateSelect(t_id=str(self.values[0].id))))
+        t_id = str(self.values[0].id)
+        # 🟢 แสดงแท็กชื่อเพื่อน และส่งต่อไปยัง DateSelectView
+        await it.response.edit_message(
+            content=f"🎯 **ลาแทนคุณ:** {self.values[0].mention}\n👉 **กรุณาเลือกวันที่ลาด้านล่าง:**", 
+            view=DateSelectView(t_id=t_id)
+        )
+
+# 🟢 คลาสจัดการเมนูเลือกวัน (ตั้ง timeout 300 วิ + มีปุ่มย้อนกลับไปเลือกเพื่อนใหม่)
+# 🟢 คลาสจัดการหน้าเลือกวัน (มีปุ่มย้อนกลับไปเลือกเพื่อนใหม่ ถ้าเป็นการลาแทนเพื่อน)
+class DateSelectView(discord.ui.View):
+    def __init__(self, t_id=None):
+        super().__init__(timeout=300)
+        self.t_id = t_id
+        self.add_item(DateSelect(t_id=t_id))
+        
+        if self.t_id:
+            back_btn = discord.ui.Button(label="🔙 เลือกเพื่อนใหม่", style=discord.ButtonStyle.secondary, row=1)
+            async def back_to_friend(it: discord.Interaction):
+                await it.response.edit_message(content="👤 **เลือกเพื่อน:**", view=SubMenuView(it, FriendSelect()))
+            back_btn.callback = back_to_friend
+            self.add_item(back_btn)
+            
+        close_btn = discord.ui.Button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
+        async def close_menu(it: discord.Interaction):
+            await it.response.defer()
+            try: await it.delete_original_response()
+            except: pass
+        close_btn.callback = close_menu
+        self.add_item(close_btn)
 
 class SubMenuView(discord.ui.View):
     def __init__(self, o_it, item=None):
@@ -1602,7 +1630,15 @@ class DateSelect(discord.ui.Select):
         if val == "t": title, s, e, is_fixed = "ลาวันนี้", now.strftime("%d/%m/%Y"), now.strftime("%d/%m/%Y"), True
         elif val == "tm": title, s, e, is_fixed = "ลาพรุ่งนี้", (now + timedelta(days=1)).strftime("%d/%m/%Y"), (now + timedelta(days=1)).strftime("%d/%m/%Y"), True
         else: title, s, e, is_fixed = "ลาแบบระบุวันเอง", "", "", False
-        await it.response.edit_message(content=f"✅ เลือกช่วงเวลา: **{title}**\n👉 กรุณาเลือกประเภทการลาด้านล่าง:\n 🔴 เลือกได้มากกว่า1ประเภท", view=LeaveCategoryView(title, s, e, self.t_id, is_f=is_fixed))
+
+        # 🟢 แสดงแปะแท็กชื่อเพื่อนในขั้นตอนเลือกประเภท
+        prefix = f"✅ **ลาแทนคุณ:** <@{self.t_id}>\n" if self.t_id else ""
+        content_text = (
+            f"{prefix}"
+            f"✅ **วันที่ลา:** {title}\n"
+            f"👉 **เลือกประเภทการลา (เลือกได้มากกว่า 1 ประเภท)**"
+        )
+        await it.response.edit_message(content=content_text, view=LeaveCategoryView(title, s, e, self.t_id, is_f=is_fixed))
 
 class LeaveCategorySelect(discord.ui.Select):
     def __init__(self):
@@ -1621,7 +1657,7 @@ class LeaveCategorySelect(discord.ui.Select):
 
 class LeaveCategoryView(discord.ui.View):
     def __init__(self, m_title, s_v, e_v, t_id=None, is_f=False):
-        super().__init__(timeout=300) # 🟢 ปุ่มยืนยันเลือกประเภท 300 วินาที
+        super().__init__(timeout=300)
         self.m_title, self.s_v, self.e_v, self.t_id, self.is_f = m_title, s_v, e_v, t_id, is_f
         self.selected_cats = []
         self.add_item(LeaveCategorySelect())
@@ -1636,12 +1672,18 @@ class LeaveCategoryView(discord.ui.View):
         else:
             final_cat = self.selected_cats
 
-        # เด้ง Modal กรอกรายละเอียดต่อทันที
         await it.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, final_cat, self.t_id, self.is_f))
         try:
             await it.delete_original_response()
         except:
             pass
+
+    # 🟢 ปุ่มย้อนกลับไปเลือกวัน (คงแท็กชื่อเพื่อนถ้ามี)
+    @discord.ui.button(label="🔙 ย้อนกลับไปเลือกวัน", style=discord.ButtonStyle.secondary, row=1)
+    async def back_to_date(self, it: discord.Interaction, b: discord.ui.Button):
+        prefix = f"🎯 **ลาแทนคุณ:** <@{self.t_id}>\n" if self.t_id else ""
+        txt = f"{prefix}👉 **กรุณาเลือกวันที่ลาด้านล่าง:**"
+        await it.response.edit_message(content=txt, view=DateSelectView(t_id=self.t_id))
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
     async def cls(self, it: discord.Interaction, b: discord.ui.Button):
