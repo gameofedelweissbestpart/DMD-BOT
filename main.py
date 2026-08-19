@@ -528,9 +528,10 @@ class AdminPanelView(discord.ui.View):
 import calendar
 THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
 
+# 🟢 1. ปุ่มเลือกเดือนใหม่ (กำหนดให้อยู่ row=4)
 class ReselectMonthButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary)
+        super().__init__(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary, row=4)
 
     async def callback(self, it: discord.Interaction):
         await send_month_selection(it)
@@ -650,7 +651,7 @@ class MonthlyUserSelect(discord.ui.Select):
         
         await it.edit_original_response(embed=em, view=MonthlyDetailView(self.guild_obj, self.year, self.month))
 
-# 🟢 1. อัปเดตคลาส MonthlyOverviewView (เพิ่มปุ่มปิดเมนู)
+# 🟢 2. คลาส MonthlyOverviewView (ปุ่มปิดเมนูอยู่ row=4)
 class MonthlyOverviewView(discord.ui.View):
     def __init__(self, guild, year, month):
         super().__init__(timeout=600)
@@ -658,15 +659,15 @@ class MonthlyOverviewView(discord.ui.View):
         self.year = year
         self.month = month
 
-        # เพิ่มปุ่มปิดเมนูไว้ท้ายสุด
-        close_btn = discord.ui.Button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
-        async def close_callback(it: discord.Interaction):
-            await it.response.defer()
-            try: await it.delete_original_response()
-            except: pass
-        close_btn.callback = close_callback
-        self.add_item(close_btn)
+    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=4)
+    async def close_menu(self, it: discord.Interaction, b: discord.ui.Button):
+        await it.response.defer()
+        try:
+            await it.delete_original_response()
+        except:
+            pass
 
+# 🟢 3. ฟังก์ชันสร้างหน้าสรุป (เพิ่ม Dropdown ให้ครบก่อน แล้วค่อยใส่ปุ่มต่อท้าย)
 async def generate_and_send_monthly_overview(it: discord.Interaction, guild, year, month):
     gid = str(guild.id)
     leaves = load_data(gid, "leaves", [])
@@ -678,13 +679,10 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     last_day = calendar.monthrange(year, month)[1]
     m_end = datetime(year, month, last_day).date()
 
-    # --- 🟢 Logic คำนวณช่วงวันที่และเวลาอัปเดตสำหรับ Embed ---
     if year == now_date.year and month == now_date.month:
-        # กรณีเดือนปัจจุบัน (ยังไม่จบเดือน)
         date_range_txt = f"01/{month:02d}/{year} - {now_date.strftime('%d/%m/%Y')}"
         info_label = "📌 **ข้อมูล ณ วันที่:**"
     else:
-        # กรณีเดือนในอดีต (จบเดือนแล้ว)
         date_range_txt = f"01/{month:02d}/{year} - {last_day:02d}/{month:02d}/{year}"
         info_label = "📌 **ข้อมูลทั้งเดือน:**"
         
@@ -728,9 +726,8 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
 
     month_name = f"{THAI_MONTHS[month-1]} {year}"
     
-    # 🟢 ประกอบข้อความส่วนหัวใหม่ (แยกบรรทัดโปร่งสบาย สวยงาม)
     desc = (
-        f"## 📊 สรุปประวัติการลาประจำเดือน {month_name}\n"
+        f"## 📊 ประวัติการลาประจำเดือน {month_name}\n"
         f"{info_label} {date_range_txt}\n"
         f"{update_time_txt}\n"
         f"{LONG_SEP}\n\n"
@@ -765,6 +762,7 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
         if data["count"] == 0:
             all_user_opts.append(discord.SelectOption(label=f"{data['member'].display_name} | (ไม่เคยลา)", value=uid, emoji="✅"))
     
+    # ใส่ Dropdown สมาชิกทั้งหมดลงใน View ก่อน
     if all_user_opts:
         for start in range(0, len(all_user_opts), 25):
             end = start + 25
@@ -772,6 +770,7 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
             placeholder_text = f"🔍 เลือกสมาชิก (ลำดับที่ {start+1}-{min(end, len(all_user_opts))})..."
             view.add_item(MonthlyUserSelect(guild, year, month, chunk, placeholder_text))
 
+    # ใส่ปุ่มเลือกเดือนใหม่ลงไปเป็นขั้นตอนสุดท้าย
     view.add_item(ReselectMonthButton())
 
     if not it.response.is_done():
