@@ -148,9 +148,9 @@ async def update_summary_board(guild):
                     on_behalf = ""
 
                 # 🟢 ปรับเฉพาะจุดนี้: เอาเฉพาะคำว่า วันที่: และช่วงวัน ออกจากกล่องเทา ส่วน (รวม X วัน) ใส่กล่องเทาไว้ตามสั่ง
-                desc += f" ⠀⠀• วันที่: {dr} `(รวม {leaf.get('total_days', 1)} วัน)`\n"
-                desc += f" ⠀⠀⠀⠀⤷ **ประเภท:** {cat_str}\n"
-                desc += f" ⠀⠀⠀⠀⤷ **เหตุผล:** {leaf.get('reason', '-')}{on_behalf}\n"
+                desc += f" ⠀• **วันที่:** {dr} `(รวม {leaf.get('total_days', 1)} วัน)`\n"
+                desc += f" ⠀⠀⤷ **ประเภท:** {cat_str}\n"
+                desc += f" ⠀⠀⤷ **เหตุผล:** {leaf.get('reason', '-')}{on_behalf}\n"
             
             # 🟢 เว้นระยะห่างก่อนขึ้นชื่อคนถัดไป
             desc += "\n"
@@ -170,7 +170,7 @@ async def update_summary_board(guild):
     # --- ส่วนที่ 3: สรุปจำนวน (เพิ่มเส้นคั่นด้านบนตามสั่ง) ---[cite: 4]
     desc += f"{LONG_SEP}\n" 
     desc += f"**📊 สรุปจำนวนคนลาวันนี้: {len(grouped_leaves)} คน**\n"
-    desc += f"**📅 อัปเดตล่าสุด: {get_thai_time().strftime('%d/%m/%Y %H:%M น.')}**"
+    desc += f"**📅 อัปเดตล่าสุด: วันที่ {get_thai_time().strftime('%d/%m/%Y เวลา %H:%M น.')}**"
     
     em = discord.Embed(description=desc, color=0x2B2D31)
     target = None
@@ -1597,14 +1597,11 @@ class DateSelect(discord.ui.Select):
         if val == "t": title, s, e, is_fixed = "ลาวันนี้", now.strftime("%d/%m/%Y"), now.strftime("%d/%m/%Y"), True
         elif val == "tm": title, s, e, is_fixed = "ลาพรุ่งนี้", (now + timedelta(days=1)).strftime("%d/%m/%Y"), (now + timedelta(days=1)).strftime("%d/%m/%Y"), True
         else: title, s, e, is_fixed = "ลาแบบระบุวันเอง", "", "", False
-        await it.response.edit_message(content=f"✅ เลือกช่วงเวลา: **{title}**\n👉 กรุณาเลือกประเภทการลาด้านล่าง:", view=SubMenuView(it, LeaveCategorySelect(title, s, e, self.t_id, is_f=is_fixed)))
+        await it.response.edit_message(content=f"✅ เลือกช่วงเวลา: **{title}**\n👉 กรุณาเลือกประเภทการลาด้านล่าง:", view=LeaveCategoryView(title, s, e, self.t_id, is_f=is_fixed))
 
 class LeaveCategorySelect(discord.ui.Select):
-    def __init__(self, m_title, s_v, e_v, t_id=None, is_f=False):
-        self.m_title, self.s_v, self.e_v, self.t_id, self.is_f = m_title, s_v, e_v, t_id, is_f
+    def __init__(self):
         opts = [discord.SelectOption(label=x, emoji="📝") for x in LEAVE_CATEGORIES]
-        
-        # 🟢 เปิด Multi-select ให้เลือกได้หลายประเภท (ใช้ได้ทั้งลาเอง และ ลาแทนเพื่อน)
         super().__init__(
             placeholder="📝 เลือกประเภทการลา (เลือกได้หลายอัน)...", 
             min_values=1, 
@@ -1613,19 +1610,39 @@ class LeaveCategorySelect(discord.ui.Select):
         )
         
     async def callback(self, it: discord.Interaction):
-        selected_cats = self.values
-        # 🟢 หากเลือก "ลาพีคไทม์" ร่วมกับกิจกรรมอื่น ให้ตัดเหลือแค่ "ลาพีคไทม์"
-        if "ลาพีคไทม์ (ลาทุกกิจกรรม)" in selected_cats:
+        # บันทึกค่าที่เลือกเก็บไว้ใน View เพื่อรอปุ่มกด
+        self.view.selected_cats = self.values
+        await it.response.defer()
+
+class LeaveCategoryView(discord.ui.View):
+    def __init__(self, m_title, s_v, e_v, t_id=None, is_f=False):
+        super().__init__(timeout=120)
+        self.m_title, self.s_v, self.e_v, self.t_id, self.is_f = m_title, s_v, e_v, t_id, is_f
+        self.selected_cats = []
+        self.add_item(LeaveCategorySelect())
+
+    @discord.ui.button(label="✅ ยืนยันประเภทการลาที่เลือก", style=discord.ButtonStyle.success, row=1)
+    async def confirm_category(self, it: discord.Interaction, b: discord.ui.Button):
+        if not self.selected_cats:
+            return await it.response.send_message("❌ **กรุณาคลิกเลือกประเภทการลาในกล่องด้านบนก่อนกดปุ่มยืนยันครับ!**", ephemeral=True)
+
+        if "ลาพีคไทม์ (ลาทุกกิจกรรม)" in self.selected_cats:
             final_cat = ["ลาพีคไทม์ (ลาทุกกิจกรรม)"]
         else:
-            final_cat = selected_cats
+            final_cat = self.selected_cats
 
-        # 🟢 ส่งค่า final_cat (ที่เป็น list) และ t_id (ID เพื่อน) ไปยัง LeaveModal
+        # เด้ง Modal กรอกรายละเอียดต่อทันที
         await it.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, final_cat, self.t_id, self.is_f))
         try:
             await it.delete_original_response()
         except:
             pass
+
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
+    async def cls(self, it: discord.Interaction, b: discord.ui.Button):
+        await it.response.defer()
+        try: await it.delete_original_response()
+        except: pass
 
 @bot.command()
 @commands.has_any_role("Admin", "ผู้ดูแล")
