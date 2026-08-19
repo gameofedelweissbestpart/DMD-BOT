@@ -435,7 +435,11 @@ class AdminSubMenuView(discord.ui.View):
                     "- สมาชิกสามารถแจ้งลาได้สูงสุดไม่เกิน **15 วัน** ต่อการแจ้ง 1 ครั้ง\n"
                     "- ระบุเหตุผลการลาให้ชัดเจน (เช่น ติด OC, ธุระทางบ้าน, ลาป่วย)\n"
                     "- ระบบไม่อนุญาตให้ลาย้อนหลัง หากมีเหตุฉุกเฉินให้แจ้งแอดมินโดยตรง\n"
-                    "- โปรดตรวจสอบข้อมูลให้ถูกต้อง การแจ้งลาเท็จจะมีบทลงโทษตามกฎแก๊ง"
+                    "- โปรดตรวจสอบข้อมูลให้ถูกต้อง การแจ้งลาเท็จจะมีบทลงโทษตามกฎแก๊ง\n\n"
+                    "**🆘__รายละเอียดค่าปรับ__🆘**\n"
+                    "- แจ้งลาก่อน 21:00 น. → ไม่มีค่าปรับ\n"
+                    "- แจ้งลาหลัง 21:00 น. → ค่าปรับ 500K\n"
+                    "- ไม่แจ้งลา / หาย → ค่าปรับ 1M"
                 ), 
                 color=0x2B2D31
             )
@@ -1616,7 +1620,7 @@ class LeaveCategorySelect(discord.ui.Select):
 
 class LeaveCategoryView(discord.ui.View):
     def __init__(self, m_title, s_v, e_v, t_id=None, is_f=False):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300) # 🟢 ปุ่มยืนยันเลือกประเภท 300 วินาที
         self.m_title, self.s_v, self.e_v, self.t_id, self.is_f = m_title, s_v, e_v, t_id, is_f
         self.selected_cats = []
         self.add_item(LeaveCategorySelect())
