@@ -328,6 +328,9 @@ class RandomNumberInputModal(discord.ui.Modal):
             if val <= 0: raise ValueError()
         except ValueError:
             await interaction.response.send_message("❌ กรุณากรอกตัวเลขจำนวนเต็มที่มากกว่า 0 เท่านั้น", ephemeral=True)
+            await asyncio.sleep(5)
+            try: await interaction.delete_original_response()
+            except: pass
             return
 
         available_count = len([m for m in self.session.members if m.id not in self.session.exempt_ids])
@@ -337,6 +340,9 @@ class RandomNumberInputModal(discord.ui.Modal):
                 f"⚠️ **จำนวนคนไม่เพียงพอ!**\nมีสมาชิกพร้อมสุ่มทั้งหมด {available_count} คน (ไม่รวมคนยกเว้น) แต่คุณระบุ {val} คน",
                 ephemeral=True
             )
+            await asyncio.sleep(5)
+            try: await interaction.delete_original_response()
+            except: pass
             return
 
         self.session.count_num = val
@@ -351,7 +357,10 @@ class RandomNumberInputModal(discord.ui.Modal):
         embed = generate_random_result(self.session, [], interaction.user)
         target_channel = interaction.guild.get_channel(self.session.target_channel_id)
         if not isinstance(target_channel, discord.TextChannel):
-            await interaction.followup.send("❌ ไม่พบห้องข้อความปลายทาง", ephemeral=True)
+            followup_err = await interaction.followup.send("❌ ไม่พบห้องข้อความปลายทาง", ephemeral=True)
+            await asyncio.sleep(5)
+            try: await followup_err.delete()
+            except: pass
             return
 
         role_mention = f"🔔 <@&{self.session.role_tag_id}>\n" if self.session.role_tag_id else ""
@@ -420,16 +429,19 @@ class RandomStep2ConfigView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=self)
 
+    # 🟢 เพิ่มการตั้งเวลาลบข้อความเตือนอัตโนมัติภายใน 5 วินาที
     @discord.ui.button(label="🎲 ระบุตัวเลขและเริ่มสุ่ม", style=discord.ButtonStyle.success, row=2)
     async def start_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.session.target_channel_id:
             await interaction.response.send_message("⚠️ กรุณาเลือกห้องสำหรับส่งผลประกาศก่อนครับ!", ephemeral=True)
+            await asyncio.sleep(5)
+            try: await interaction.delete_original_response()
+            except: pass
             return
 
         modal = RandomNumberInputModal(self.session)
         await interaction.response.send_modal(modal)
 
-    # 🟢 ย้อนกลับไปขั้นตอนที่ 1 โดยยังคงจำข้อมูลยศและคนยกเว้น
     @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, row=2)
     async def back_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.guild: return
