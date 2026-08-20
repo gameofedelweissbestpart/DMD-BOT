@@ -159,22 +159,27 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
 
         embed.description = "\n\n".join(description_parts) if description_parts else "*ไม่มีสมาชิกเพียงพอ*"
 
-    # 🟢 จัดระยะห่างใหม่ ชิดเส้นคั่น พอดี 1 บรรทัด
+    # 🟢 จัดโครงสร้าง Field ใหม่ เว้นระยะ 1 บรรทัดเป๊ะทั้งเส้นคั่นบนและเส้นคั่นล่าง
     exempt_members = [m for m in session.members if m.id in session.exempt_ids]
     if exempt_members:
         exempt_str = "\n".join([f"• `{m.display_name}`" for m in exempt_members])
-        exempt_field_val = f"{exempt_str}\n\n{LONG_SEP}"
     else:
-        exempt_field_val = f"*ไม่มี*\n\n{LONG_SEP}"
+        exempt_str = "*ไม่มี*"
+
+    history_text = "\n".join(session.history_logs)
+
+    combined_field_value = (
+        f"🚫 **รายชื่อที่ยกเว้นในรอบนี้ ({len(exempt_members)} คน):**\n"
+        f"{exempt_str}\n\n"
+        f"{LONG_SEP}\n\n"
+        f"{history_text}"
+    )
 
     embed.add_field(
-        name=f"{LONG_SEP}\n🚫 **รายชื่อที่ยกเว้นในรอบนี้ ({len(exempt_members)} คน):**",
-        value=exempt_field_val,
+        name=f"\n{LONG_SEP}",
+        value=combined_field_value,
         inline=False
     )
-    
-    history_text = "\n".join(session.history_logs)
-    embed.add_field(name="\u200b", value=history_text, inline=False)
 
     return embed
 
