@@ -174,8 +174,8 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
         f"{main_content}\n\n"
         f"{LONG_SEP}\n\n"
         f"🚫 **รายชื่อที่ยกเว้นในรอบนี้ ({len(exempt_members)} คน):**\n"
-        f"{exempt_str}\n"
-        f"{LONG_SEP}\n"
+        f"{exempt_str}\n\n"
+        f"{LONG_SEP}\n\n"
         f"{history_text}"
     )
 
