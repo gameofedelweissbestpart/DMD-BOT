@@ -211,14 +211,17 @@ class RerollExemptSelectView(discord.ui.View):
         available_members = [m for m in session.members if m.id not in session.exempt_ids]
         chunk_size = 25
 
-        for i in range(0, len(available_members), chunk_size):
+        # 🟢 กำหนด Row ของ Dropdown และปุ่มไม่ให้ทับซ้อนกัน
+        max_chunks = 2
+        for idx, i in enumerate(range(0, min(len(available_members), max_chunks * chunk_size), chunk_size)):
             chunk = available_members[i:i + chunk_size]
             options = [discord.SelectOption(label=m.display_name, value=str(m.id)) for m in chunk]
             select = discord.ui.Select(
                 placeholder=f"🚫 เลือกคนยกเว้นเพิ่ม (ลำดับที่ {i+1}-{i+len(chunk)})...",
                 min_values=0,
                 max_values=len(options),
-                options=options
+                options=options,
+                row=idx
             )
             select.callback = self.make_select_callback(select)
             self.add_item(select)
@@ -231,12 +234,12 @@ class RerollExemptSelectView(discord.ui.View):
             await interaction.response.defer()
         return select_callback
 
-    @discord.ui.button(label="✅ ยืนยันสุ่มใหม่", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="✅ ยืนยันสุ่มใหม่", style=discord.ButtonStyle.success, row=2)
     async def confirm_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         modal = RerollConfirmModal(self.session, self.selected_exempt_ids)
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.danger, row=2)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="❌ ยกเลิกการสุ่มใหม่", view=None)
 
@@ -391,7 +394,7 @@ class RandomStep1ExemptView(discord.ui.View):
         self.session = session
         self.guild = guild
 
-        # Dropdown เลือกยศเพื่อกรองรายชื่อ (ไม่เลือก = สุ่มทุกคน)
+        # 🟢 1. Dropdown Filter เลือกยศ (จัดให้อยู่ Row 0)
         roles = [r for r in guild.roles if not r.is_default() and not r.is_bot_managed()]
         role_options = [discord.SelectOption(label=f"ยศ: {r.name}", value=str(r.id)) for r in roles[:25]]
         
@@ -409,6 +412,7 @@ class RandomStep1ExemptView(discord.ui.View):
         self.render_member_selects()
 
     def render_member_selects(self):
+        # ลบ Dropdown เดิมออกก่อน
         for item in list(self.children):
             if isinstance(item, discord.ui.Select) and item.placeholder and "🚫" in item.placeholder:
                 self.remove_item(item)
@@ -416,7 +420,9 @@ class RandomStep1ExemptView(discord.ui.View):
         members = self.session.members
         chunk_size = 25
         
-        for i in range(0, len(members), chunk_size):
+        # 🟢 แก้ไขการรัน Row (Row 1 และ Row 2) ป้องกัน Dropdown ชนกันจนบอทค้าง
+        max_chunks = 2
+        for idx, i in enumerate(range(0, min(len(members), max_chunks * chunk_size), chunk_size)):
             chunk = members[i:i + chunk_size]
             start_num = i + 1
             end_num = i + len(chunk)
@@ -427,7 +433,7 @@ class RandomStep1ExemptView(discord.ui.View):
                 min_values=0,
                 max_values=len(options),
                 options=options,
-                row=1 if i == 0 else 2
+                row=idx + 1  # idx=0 -> row 1, idx=1 -> row 2
             )
             select.callback = self.make_select_callback(select)
             self.add_item(select)
