@@ -132,11 +132,11 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
     round_title_badge = f" [ 🔄 สุ่มใหม่รอบที่ {session.round_count} ]" if session.round_count > 0 else ""
     embed = discord.Embed(color=0x3498db)
 
-    # 1. รายชื่อผู้ได้รับเลือก
+    # 1. รายชื่อผู้ได้รับเลือก (ตัวเลขธรรมดา + ชื่อใส่กรอบเทา)
     if session.mode == "single":
         embed.title = f"🎲 ผลการสุ่มรายชื่อสมาชิก ({session.count_num} คน){round_title_badge}"
         selected = shuffled[:session.count_num]
-        result_lines = [f"`{idx}.` `{m.display_name}`" for idx, m in enumerate(selected, 1)]
+        result_lines = [f"{idx}. `{m.display_name}`" for idx, m in enumerate(selected, 1)]
         main_content = "\n".join(result_lines) if result_lines else "*ไม่มีผู้ได้รับเลือก*"
 
     elif session.mode == "team":
@@ -154,22 +154,22 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
                 icon = team_icons[(idx - 1) % len(team_icons)]
                 team_name = f"{icon} **ทีมที่ {idx} ({len(team)} คน):**"
             
-            members_str = "\n".join([f"• `{m.display_name}`" for m in team])
+            members_str = "\n".join([f"{t_idx}. `{m.display_name}`" for t_idx, m in enumerate(team, 1)])
             description_parts.append(f"{team_name}\n{members_str}")
 
         main_content = "\n\n".join(description_parts) if description_parts else "*ไม่มีสมาชิกเพียงพอ*"
 
-    # 2. รายชื่อคนยกเว้น
+    # 2. รายชื่อคนยกเว้น (ตัวเลขธรรมดา + ชื่อใส่กรอบเทา)
     exempt_members = [m for m in session.members if m.id in session.exempt_ids]
     if exempt_members:
-        exempt_str = "\n".join([f"• `{m.display_name}`" for m in exempt_members])
+        exempt_str = "\n".join([f"{idx}. `{m.display_name}`" for idx, m in enumerate(exempt_members, 1)])
     else:
         exempt_str = "*ไม่มี*"
 
     # 3. ประวัติการสุ่ม
     history_text = "\n".join(session.history_logs)
 
-    # 🟢 รวมทุกอย่างไว้ใน description เพื่อให้คุมบรรทัดเว้น 1 เท่ากันเป๊ะ
+    # 🟢 รวมทุกอย่างไว้ใน description ตามรูปแบบที่คุณแก้ไขไว้เป๊ะๆ
     embed.description = (
         f"{main_content}\n\n"
         f"{LONG_SEP}\n\n"
@@ -263,10 +263,10 @@ class RerollExemptSelectView(discord.ui.View):
         modal = RerollConfirmModal(self.session, self.selected_exempt_ids, self)
         await interaction.response.send_modal(modal)
 
+    # 🟢 ปรับปุ่มยกเลิกให้ลบเมนูทิ้งทันทีเนียนๆ เหมือนปุ่มปิดเมนู
     @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.danger, row=2)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="❌ ยกเลิกการสุ่มใหม่", view=None)
-        await asyncio.sleep(2)
+        await interaction.response.defer()
         try: await interaction.delete_original_response()
         except: pass
 
