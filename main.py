@@ -201,40 +201,31 @@ class RerollConfirmModal(discord.ui.Modal, title="🔄 ยืนยันกา�
             role_mention = f"🔔 <@&{self.session.role_tag_id}>\n" if self.session.role_tag_id else ""
             await interaction.message.edit(content=role_mention, embed=new_embed, view=RerollView(self.session))
 
-class RerollExemptSelectView(discord.ui.View):
-    def __init__(self, session: RandomSession):
-        super().__init__(timeout=300)
+class RerollConfirmModal(discord.ui.Modal, title="🔄 ยืนยันการสุ่มใหม่อีกรอบ"):
+    def __init__(self, session: RandomSession, selected_exempt_ids: List[int]):
+        super().__init__()
         self.session = session
-        self.selected_exempt_ids: List[int] = []
+        self.selected_exempt_ids = selected_exempt_ids
 
-        available_members = [m for m in session.members if m.id not in session.exempt_ids]
-        options = []
-        for m in available_members[:25]:
-            options.append(discord.SelectOption(label=m.display_name, value=str(m.id)))
+    notice = discord.ui.TextInput(
+        label="⚠️ คำเตือนการบันทึกประวัติ",
+        style=discord.TextStyle.paragraph,
+        default="การกดสุ่มใหม่จะทำการบันทึกชื่อ Display Name ของคุณ รอบการสุ่ม และเวลาปัจจุบันลงในประกาศผลเพื่อความโปร่งใส",
+        required=False
+    )
 
-        if options:
-            select = discord.ui.Select(
-                placeholder="🚫 เลือกคนที่ต้องการยกเว้นเพิ่ม (ไม่บังคับ)...",
-                min_values=0,
-                max_values=len(options),
-                options=options
-            )
-            select.callback = self.select_callback
-            self.add_item(select)
-
-    async def select_callback(self, interaction: discord.Interaction):
-        select_obj: discord.ui.Select = interaction.data # type: ignore
-        self.selected_exempt_ids = [int(v) for v in select_obj.values]
-        await interaction.response.send_message("บันทึกการเลือกคนยกเว้นเรียบร้อย กรุณากดปุ่มเพื่อสุ่มใหม่", ephemeral=True)
-
-    @discord.ui.button(label="🎲 ยืนยันสุ่มใหม่และบันทึกประวัติ", style=discord.ButtonStyle.primary)
-    async def confirm_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = RerollConfirmModal(self.session, self.selected_exempt_ids)
-        await interaction.response.send_modal(modal)
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        self.session.round_count += 1
+        new_embed = generate_random_result(self.session, self.selected_exempt_ids, interaction.user)
+        
+        if interaction.message:
+            role_mention = f"🔔 <@&{self.session.role_tag_id}>\n" if self.session.role_tag_id else ""
+            await interaction.message.edit(content=role_mention, embed=new_embed, view=RerollView(self.session))
 
 class RerollView(discord.ui.View):
     def __init__(self, session: RandomSession):
-        super().__init__(timeout=86400) # 24 ชั่วโมง
+        super().__init__(timeout=86400)
         self.session = session
 
     @discord.ui.button(label="🔄 สุ่มใหม่อีกรอบ", style=discord.ButtonStyle.secondary, custom_id="btn_reroll_main")
@@ -378,11 +369,34 @@ class RandomStep2ConfigView(discord.ui.View):
         await interaction.response.edit_message(content="❌ ยกเลิกการตั้งค่าเรียบร้อยแล้ว", view=None)
 
 class RandomStep1ExemptView(discord.ui.View):
-    def __init__(self, session: RandomSession):
+    def __init__(self, session: RandomSession, guild: discord.Guild):
         super().__init__(timeout=300)
         self.session = session
+        self.guild = guild
 
-        members = session.members
+        # Dropdown เลือกยศเพื่อกรองรายชื่อ (ไม่เลือก = สุ่มทุกคน)
+        roles = [r for r in guild.roles if not r.is_default() and not r.is_bot_managed()]
+        role_options = [discord.SelectOption(label=f"ยศ: {r.name}", value=str(r.id)) for r in roles[:25]]
+        
+        if role_options:
+            role_select = discord.ui.Select(
+                placeholder="🏷️ Filter เลือกยศที่ต้องการสุ่ม (ไม่เลือก = สุ่มสมาชิกทุกคน)...",
+                min_values=0,
+                max_values=1,
+                options=role_options,
+                row=0
+            )
+            role_select.callback = self.role_filter_callback
+            self.add_item(role_select)
+
+        self.render_member_selects()
+
+    def render_member_selects(self):
+        for item in list(self.children):
+            if isinstance(item, discord.ui.Select) and item.placeholder and "🚫" in item.placeholder:
+                self.remove_item(item)
+
+        members = self.session.members
         chunk_size = 25
         
         for i in range(0, len(members), chunk_size):
@@ -395,10 +409,36 @@ class RandomStep1ExemptView(discord.ui.View):
                 placeholder=f"🚫 เลือกคนยกเว้น (ลำดับที่ {start_num}-{end_num})...",
                 min_values=0,
                 max_values=len(options),
-                options=options
+                options=options,
+                row=1 if i == 0 else 2
             )
             select.callback = self.make_select_callback(select)
             self.add_item(select)
+
+    async def role_filter_callback(self, interaction: discord.Interaction):
+        select_obj: discord.ui.Select = interaction.data # type: ignore
+        if select_obj.values:
+            selected_role_id = int(select_obj.values[0])
+            role = self.guild.get_role(selected_role_id)
+            if role:
+                self.session.members = [m for m in role.members if not m.bot]
+        else:
+            self.session.members = [m for m in self.guild.members if not m.bot]
+
+        self.session.exempt_ids = []
+        self.render_member_selects()
+
+        role_txt = f"<@&{select_obj.values[0]}>" if select_obj.values else "`สมาชิกทุกคน`"
+        await interaction.response.edit_message(
+            content=(
+                f"🎲 **__ขั้นตอนที่ 1: เลือกยศและคนที่ไม่ต้องการให้เข้าร่วมสุ่ม__**\n"
+                f"📌 **ยศที่เลือกสุ่มขณะนี้:** {role_txt} (รวม {len(self.session.members)} คน)\n\n"
+                f"1. เลือกยศที่ต้องการสุ่มจาก Dropdown แถบแรก (หากไม่เลือก = สุ่มทุกคน)\n"
+                f"2. เลือกรายชื่อคนที่ไม่พร้อมสุ่มในรอบนี้\n"
+                f"3. กดปุ่ม **'➔ ถัดไป (เลือกห้องและยศ)'** เพื่อทำรายการต่อ"
+            ),
+            view=self
+        )
 
     def make_select_callback(self, select_obj: discord.ui.Select):
         async def select_callback(interaction: discord.Interaction):
@@ -408,7 +448,7 @@ class RandomStep1ExemptView(discord.ui.View):
             await interaction.response.defer()
         return select_callback
 
-    @discord.ui.button(label="➔ ถัดไป (เลือกห้องและยศ)", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="➔ ถัดไป (เลือกห้องและยศ)", style=discord.ButtonStyle.primary, row=3)
     async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = RandomStep2ConfigView(self.session)
         
@@ -418,11 +458,12 @@ class RandomStep1ExemptView(discord.ui.View):
         exempt_str = "\n".join([f"• `{m.display_name}`" for m in exempt_m]) if exempt_m else "• *ไม่มี*"
 
         text = (
-            "📢 **<u>ขั้นตอนที่ 2: ตั้งค่าการส่งผลประกาศสุ่ม</u>**\n"
+            "📢 **__ขั้นตอนที่ 2: ตั้งค่าการส่งผลประกาศสุ่ม__**\n"
             "1. **กรุณาเลือกห้องข้อความที่ต้องการประกาศผลลัพธ์จาก Dropdown (บังคับเลือก)**\n"
             "2. เลือกยศที่ต้องการให้ระบบแท็กแจ้งเตือนเมื่อประกาศผล (ไม่เลือก = ไม่แท็ก)\n"
             "3. กดปุ่ม **'🎲 ระบุตัวเลขและเริ่มสุ่ม'** เพื่อพิมพ์กรอกจำนวน\n\n"
             f"{LONG_SEP}\n"
+            f"👥 **จำนวนคนเข้าสุ่มรอบนี้:** `{len(self.session.members) - len(exempt_m)}` คน\n"
             f"📍 **ห้องที่เลือกส่งผล:** {ch_str}\n"
             f"🔔 **ยศที่จะแท็กแจ้งเตือน:** {role_str}\n"
             f"🚫 **สรุปรายชื่อที่ยกเว้นในรอบนี้ ({len(exempt_m)} คน):**\n{exempt_str}\n"
@@ -430,7 +471,7 @@ class RandomStep1ExemptView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=view)
 
-    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=3)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="❌ ยกเลิกการตั้งค่าเรียบร้อยแล้ว", view=None)
 
@@ -443,18 +484,20 @@ class RandomModeView(discord.ui.View):
     async def start_step1(self, interaction: discord.Interaction, mode: str):
         session = RandomSession(
             mode=mode,
-            members=self.members,
+            members=self.members.copy(),
             exempt_ids=[],
             target_channel_id=0,
             role_tag_id=None,
             author_id=interaction.user.id
         )
         
-        view = RandomStep1ExemptView(session)
+        view = RandomStep1ExemptView(session, interaction.guild) # type: ignore
         text = (
-            "🎲 **<u>ขั้นตอนที่ 1: เลือกรายชื่อคนที่ไม่ต้องการให้เข้าร่วมสุ่ม</u>**\n"
-            "1. ติ๊กเลือกรายชื่อสมาชิกที่ไม่พร้อมสุ่มในรอบนี้จาก Dropdown ด้านล่าง (เลือกได้หลายคน หรือจะไม่เลือกเลยก็ได้)\n"
-            "2. เมื่อเลือกเสร็จแล้วให้กดปุ่ม **'➔ ถัดไป (เลือกห้องและยศ)'**\n\n"
+            "🎲 **__ขั้นตอนที่ 1: เลือกยศและคนที่ไม่ต้องการให้เข้าร่วมสุ่ม__**\n"
+            "📌 **ยศที่เลือกสุ่มขณะนี้:** `สมาชิกทุกคน`\n\n"
+            "1. เลือกยศที่ต้องการสุ่มจาก Dropdown แถบแรก (หากไม่เลือก = สุ่มทุกคน)\n"
+            "2. ติ๊กเลือกคนที่ไม่พร้อมสุ่มในรอบนี้\n"
+            "3. กดปุ่ม **'➔ ถัดไป (เลือกห้องและยศ)'** เพื่อทำรายการต่อ\n\n"
             f"{LONG_SEP}"
         )
         await interaction.response.edit_message(content=text, view=view)
@@ -470,7 +513,6 @@ class RandomModeView(discord.ui.View):
     @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="❌ ยกเลิกการตั้งค่าเรียบร้อยแล้ว", view=None)
-# =====================================================================
 
 # --- 2. ระบบตาราง Real-time (แก้ไขให้แยก Guild) ---
 async def update_summary_board(guild):
@@ -2176,12 +2218,19 @@ async def random_slash_cmd(interaction: discord.Interaction):
 
     members = [m for m in interaction.guild.members if not m.bot]
     if not members:
+        try:
+            fetched_members = [m async for m in interaction.guild.fetch_members(limit=None)]
+            members = [m for m in fetched_members if not m.bot]
+        except:
+            pass
+
+    if not members:
         await interaction.response.send_message("❌ ไม่พบสมาชิกในเซิร์ฟเวอร์", ephemeral=True)
         return
 
-    view = RandomModeView(author=interaction.user, members=members) # type: ignore
+    view = RandomModeView(author=interaction.user, members=members)
     text = (
-        "🎲 **<u>เมนูเลือกรูปแบบการสุ่มรายชื่อ</u>**\n"
+        "🎲 **__เมนูเลือกรูปแบบการสุ่มรายชื่อ__**\n"
         "กรุณาเลือกรูปแบบการสุ่มที่ต้องการใช้งานด้านล่างครับ:"
     )
     await interaction.response.send_message(content=text, view=view, ephemeral=True)
