@@ -215,9 +215,9 @@ class RerollConfirmModal(discord.ui.Modal, title="🔄 ยืนยันกา�
                 role_mention = f"🔔 <@&{self.session.role_tag_id}>\n" if self.session.role_tag_id else ""
                 await msg.edit(content=role_mention, embed=new_embed, view=RerollView(self.session))
                 
-                # 🟡 2. แจ้งเตือนสุ่มใหม่สำเร็จ -> ค้างไว้ 3 วินาทีแล้วลบ
+                # 🟡 2. แจ้งเตือนสุ่มใหม่สำเร็จ -> ค้างไว้ 5 วินาทีแล้วลบ
                 msg_ok = await interaction.followup.send("✅ **สุ่มใหม่และอัปเดตผลลัพธ์ในห้องประกาศเรียบร้อยแล้ว!**", ephemeral=True)
-                await asyncio.sleep(3)
+                await asyncio.sleep(5)
                 try: await msg_ok.delete()
                 except: pass
             except Exception as e:
@@ -407,7 +407,7 @@ class RandomStep2ConfigView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=self)
 
-    @discord.ui.button(label="🎲 ระบุตัวเลขและเริ่มสุ่ม", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="🎲 ระบุตัวเลขและเริ่มสุ่ม", style=discord.ButtonStyle.success, row=2)
     async def start_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.session.target_channel_id:
             await interaction.response.send_message("⚠️ กรุณาเลือกห้องสำหรับส่งผลประกาศก่อนครับ!", ephemeral=True)
@@ -416,9 +416,28 @@ class RandomStep2ConfigView(discord.ui.View):
         modal = RandomNumberInputModal(self.session)
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger)
+    # 🟢 ปุ่มย้อนกลับอยู่อันดับสอง
+    @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, row=2)
+    async def back_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.guild: return
+        view = RandomStep1ExemptView(self.session, interaction.guild)
+        role_txt = "`สมาชิกทุกคน`"
+        text = (
+            f"🎲 **__ขั้นตอนที่ 1: เลือกยศและคนที่ไม่ต้องการให้เข้าร่วมสุ่ม__**\n"
+            f"📌 **ยศที่เลือกสุ่มขณะนี้:** {role_txt} (รวม {len(self.session.members)} คน)\n\n"
+            f"1. เลือกยศที่ต้องการสุ่มจาก Dropdown แถบแรก (หากไม่เลือก = สุ่มทุกคน)\n"
+            f"2. เลือกรายชื่อคนที่ไม่พร้อมสุ่มในรอบนี้ (ไม่บังคับ)\n"
+            f"3. กดปุ่ม **➔ ถัดไป (เลือกห้องและยศ)** เพื่อทำรายการต่อ\n\n"
+            f"{LONG_SEP}"
+        )
+        await interaction.response.edit_message(content=text, view=view)
+
+    # 🟢 ปุ่ม "ปิดเมนู" อยู่ท้ายสุด
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=2)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="❌ ยกเลิกการตั้งค่าเรียบร้อยแล้ว", view=None)
+        await interaction.response.defer()
+        try: await interaction.delete_original_response()
+        except: pass
 
 class RandomStep1ExemptView(discord.ui.View):
     def __init__(self, session: RandomSession, guild: discord.Guild):
@@ -427,7 +446,6 @@ class RandomStep1ExemptView(discord.ui.View):
         self.guild = guild
         self.render_member_selects()
 
-    # 🟢 ใช้ RoleSelect ของ Discord โดยตรง ทำให้เลือกยศง่าย ค้นหาได้สะดวก ไม่ติดบั๊ก
     @discord.ui.select(
         cls=discord.ui.RoleSelect,
         placeholder="🏷️ Filter เลือกยศที่ต้องการสุ่ม (ไม่เลือก = สุ่มทุกคน)...",
@@ -514,9 +532,22 @@ class RandomStep1ExemptView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=view)
 
-    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=3)
+    # 🟢 ปุ่มย้อนกลับอยู่อันดับแรก
+    @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, row=3)
+    async def back_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = RandomModeView(author=interaction.user, members=self.session.members) # type: ignore
+        text = (
+            "🎲 **__เมนูเลือกรูปแบบการสุ่มรายชื่อ__**\n"
+            "กรุณาเลือกรูปแบบการสุ่มที่ต้องการใช้งานด้านล่างครับ:"
+        )
+        await interaction.response.edit_message(content=text, view=view)
+
+    # 🟢 ปุ่ม "ปิดเมนู" อยู่ท้ายสุด
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=3)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="❌ ยกเลิกการตั้งค่าเรียบร้อยแล้ว", view=None)
+        await interaction.response.defer()
+        try: await interaction.delete_original_response()
+        except: pass
 
 class RandomModeView(discord.ui.View):
     def __init__(self, author: discord.Member, members: List[discord.Member]):
@@ -562,9 +593,12 @@ class RandomModeView(discord.ui.View):
     async def team_mode(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.start_step1(interaction, "team")
 
-    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger)
+    # 🟢 เปลี่ยนเป็นข้อความ "ปิดเมนู" สไตล์เดียวกับระบบแจ้งลา
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="❌ ยกเลิกการตั้งค่าเรียบร้อยแล้ว", view=None)
+        await interaction.response.defer()
+        try: await interaction.delete_original_response()
+        except: pass
 
 # --- 2. ระบบตาราง Real-time (แก้ไขให้แยก Guild) ---
 async def update_summary_board(guild):
@@ -993,11 +1027,10 @@ class AdminPanelView(discord.ui.View):
             content="📑 **เมนูจัดการระบบลา:** เลือกการดำเนินการที่ต้องการ", 
             view=AdminLeaveManagementView(), 
             ephemeral=True
-        ) # <--- ตรวจสอบวงเล็บปิดตรงนี้ ต้องมีวงเล็บปิดครอบพารามิเตอร์ทั้งหมด
-
+        )
 
 # 🟢 เพิ่มปุ่มเรียกใช้งานระบบสุ่มรายชื่อ
-    @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.success, custom_id="admin_random_system_main")
+    @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.primary, custom_id="admin_random_system_main")
     async def random_system(self, it: discord.Interaction, b):
         members = [m for m in it.guild.members if not m.bot]
         if not members:
