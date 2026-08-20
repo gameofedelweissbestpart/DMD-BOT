@@ -132,12 +132,12 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
     round_title_badge = f" [ 🔄 สุ่มใหม่รอบที่ {session.round_count} ]" if session.round_count > 0 else ""
     embed = discord.Embed(color=0x3498db)
 
+    # 1. รายชื่อผู้ได้รับเลือก
     if session.mode == "single":
         embed.title = f"🎲 ผลการสุ่มรายชื่อสมาชิก ({session.count_num} คน){round_title_badge}"
         selected = shuffled[:session.count_num]
-        
         result_lines = [f"`{idx}.` `{m.display_name}`" for idx, m in enumerate(selected, 1)]
-        embed.description = "\n".join(result_lines) if result_lines else "*ไม่มีผู้ได้รับเลือก*"
+        main_content = "\n".join(result_lines) if result_lines else "*ไม่มีผู้ได้รับเลือก*"
 
     elif session.mode == "team":
         embed.title = f"🎲 ผลการสุ่มจัดทีม (ทีมละ {session.count_num} คน){round_title_badge}"
@@ -157,28 +157,26 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
             members_str = "\n".join([f"• `{m.display_name}`" for m in team])
             description_parts.append(f"{team_name}\n{members_str}")
 
-        embed.description = "\n\n".join(description_parts) if description_parts else "*ไม่มีสมาชิกเพียงพอ*"
+        main_content = "\n\n".join(description_parts) if description_parts else "*ไม่มีสมาชิกเพียงพอ*"
 
-    # 🟢 จัดโครงสร้าง Field ใหม่ เว้นระยะ 1 บรรทัดเป๊ะทั้งเส้นคั่นบนและเส้นคั่นล่าง
+    # 2. รายชื่อคนยกเว้น
     exempt_members = [m for m in session.members if m.id in session.exempt_ids]
     if exempt_members:
         exempt_str = "\n".join([f"• `{m.display_name}`" for m in exempt_members])
     else:
         exempt_str = "*ไม่มี*"
 
+    # 3. ประวัติการสุ่ม
     history_text = "\n".join(session.history_logs)
 
-    combined_field_value = (
-        f"🚫 **รายชื่อที่ยกเว้นในรอบนี้ ({len(exempt_members)} คน):**\n"
-        f"{exempt_str}\n\n"
+    # 🟢 รวมทุกอย่างไว้ใน description เพื่อให้คุมบรรทัดเว้น 1 เท่ากันเป๊ะ
+    embed.description = (
+        f"{main_content}\n\n"
         f"{LONG_SEP}\n\n"
+        f"🚫 **รายชื่อที่ยกเว้นในรอบนี้ ({len(exempt_members)} คน):**\n"
+        f"{exempt_str}\n"
+        f"{LONG_SEP}\n"
         f"{history_text}"
-    )
-
-    embed.add_field(
-        name=f"\n{LONG_SEP}",
-        value=combined_field_value,
-        inline=False
     )
 
     return embed
