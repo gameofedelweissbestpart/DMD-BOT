@@ -159,20 +159,19 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
 
         embed.description = "\n\n".join(description_parts) if description_parts else "*ไม่มีสมาชิกเพียงพอ*"
 
-    embed.add_field(name=LONG_SEP, value="\u200b", inline=False)
-    
+    # 🟢 จัดระยะห่างใหม่ ชิดเส้นคั่น พอดี 1 บรรทัด
     exempt_members = [m for m in session.members if m.id in session.exempt_ids]
     if exempt_members:
         exempt_str = "\n".join([f"• `{m.display_name}`" for m in exempt_members])
-        embed.add_field(
-            name=f"🚫 **รายชื่อที่ยกเว้นในรอบนี้ ({len(exempt_members)} คน):**",
-            value=exempt_str,
-            inline=False
-        )
+        exempt_field_val = f"{exempt_str}\n\n{LONG_SEP}"
     else:
-        embed.add_field(name="🚫 **รายชื่อที่ยกเว้นในรอบนี้:**", value="*ไม่มี*", inline=False)
+        exempt_field_val = f"*ไม่มี*\n\n{LONG_SEP}"
 
-    embed.add_field(name=LONG_SEP, value="\u200b", inline=False)
+    embed.add_field(
+        name=f"{LONG_SEP}\n🚫 **รายชื่อที่ยกเว้นในรอบนี้ ({len(exempt_members)} คน):**",
+        value=exempt_field_val,
+        inline=False
+    )
     
     history_text = "\n".join(session.history_logs)
     embed.add_field(name="\u200b", value=history_text, inline=False)
@@ -374,6 +373,17 @@ class RandomStep2ConfigView(discord.ui.View):
         super().__init__(timeout=300)
         self.session = session
 
+        if self.session.target_channel_id:
+            for item in self.children:
+                if isinstance(item, discord.ui.ChannelSelect):
+                    ch = discord.Object(id=self.session.target_channel_id)
+                    item.default_values = [ch]
+        if self.session.role_tag_id:
+            for item in self.children:
+                if isinstance(item, discord.ui.RoleSelect):
+                    r = discord.Object(id=self.session.role_tag_id)
+                    item.default_values = [r]
+
     @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.text], placeholder="📢 1. เลือกห้องส่งผลประกาศ (บังคับเลือก)...")
     async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect):
         self.session.target_channel_id = select.values[0].id
@@ -416,12 +426,12 @@ class RandomStep2ConfigView(discord.ui.View):
         modal = RandomNumberInputModal(self.session)
         await interaction.response.send_modal(modal)
 
-    # 🟢 ปุ่มย้อนกลับอยู่อันดับสอง
+    # 🟢 ย้อนกลับไปขั้นตอนที่ 1 โดยยังคงจำข้อมูลยศและคนยกเว้น
     @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, row=2)
     async def back_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.guild: return
         view = RandomStep1ExemptView(self.session, interaction.guild)
-        role_txt = "`สมาชิกทุกคน`"
+        role_txt = f"<@&{self.session.selected_role_id}>" if getattr(self.session, 'selected_role_id', None) else "`สมาชิกทุกคน`"
         text = (
             f"🎲 **__ขั้นตอนที่ 1: เลือกยศและคนที่ไม่ต้องการให้เข้าร่วมสุ่ม__**\n"
             f"📌 **ยศที่เลือกสุ่มขณะนี้:** {role_txt} (รวม {len(self.session.members)} คน)\n\n"
@@ -432,7 +442,6 @@ class RandomStep2ConfigView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=view)
 
-    # 🟢 ปุ่ม "ปิดเมนู" อยู่ท้ายสุด
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=2)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
@@ -444,6 +453,15 @@ class RandomStep1ExemptView(discord.ui.View):
         super().__init__(timeout=300)
         self.session = session
         self.guild = guild
+        
+        # 🟢 โหลดค่า Default ของ RoleSelect ถ้ามี
+        role_id = getattr(self.session, 'selected_role_id', None)
+        if role_id:
+            for item in self.children:
+                if isinstance(item, discord.ui.RoleSelect):
+                    r = discord.Object(id=role_id)
+                    item.default_values = [r]
+
         self.render_member_selects()
 
     @discord.ui.select(
@@ -457,9 +475,11 @@ class RandomStep1ExemptView(discord.ui.View):
         if select.values:
             selected_role = select.values[0]
             self.session.members = [m for m in selected_role.members if not m.bot]
+            self.session.selected_role_id = selected_role.id # type: ignore
             role_txt = selected_role.mention
         else:
             self.session.members = [m for m in self.guild.members if not m.bot]
+            self.session.selected_role_id = None # type: ignore
             role_txt = "`สมาชิกทุกคน`"
 
         self.session.exempt_ids = []
@@ -490,7 +510,12 @@ class RandomStep1ExemptView(discord.ui.View):
             start_num = i + 1
             end_num = i + len(chunk)
             
-            options = [discord.SelectOption(label=f"{m.display_name}", value=str(m.id)) for m in chunk]
+            # 🟢 จำค่าคนที่เคยเลือกยกเว้นไว้ (default=True)
+            options = []
+            for m in chunk:
+                is_selected = m.id in self.session.exempt_ids
+                options.append(discord.SelectOption(label=f"{m.display_name}", value=str(m.id), default=is_selected))
+
             select = discord.ui.Select(
                 placeholder=f"🚫 เลือกคนยกเว้น (ลำดับที่ {start_num}-{end_num})...",
                 min_values=0,
@@ -532,7 +557,6 @@ class RandomStep1ExemptView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=view)
 
-    # 🟢 ปุ่มย้อนกลับอยู่อันดับแรก
     @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, row=3)
     async def back_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = RandomModeView(author=interaction.user, members=self.session.members) # type: ignore
@@ -542,7 +566,6 @@ class RandomStep1ExemptView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=view)
 
-    # 🟢 ปุ่ม "ปิดเมนู" อยู่ท้ายสุด
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=3)
     async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
