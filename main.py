@@ -184,14 +184,14 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
     return embed
 
 
-class RerollConfirmModal(discord.ui.Modal, title="🔄 ยืนยันการสุ่มใหม่อีกรอบ"):
+class RerollConfirmModal(discord.ui.Modal):
     def __init__(self, session: RandomSession, selected_exempt_ids: List[int], parent_view: discord.ui.View):
-        super().__init__()
+        super().__init__(title="🔄 ยืนยันการสุ่มใหม่อีกรอบ")
         self.session = session
         self.selected_exempt_ids = selected_exempt_ids
         self.parent_view = parent_view
 
-    notice = discord.ui.TextInput(
+    notice = discord.ui.InputText(
         label="⚠️ คำเตือนการบันทึกประวัติ",
         style=discord.InputTextStyle.paragraph,
         value="การกดสุ่มใหม่จะทำการบันทึกชื่อ Display Name ของคุณ รอบการสุ่ม และเวลาปัจจุบันลงในประกาศผลเพื่อความโปร่งใส",
@@ -316,7 +316,7 @@ class RandomNumberInputModal(discord.ui.Modal):
         self.session = session
 
         label_text = "พิมพ์จำนวนคนที่ต้องการสุ่ม:" if session.mode == "single" else "พิมพ์จำนวนคนต่อ 1 ทีม:"
-        self.num_input = discord.ui.TextInput(
+        self.num_input = discord.ui.InputText(
             label=label_text,
             placeholder="เช่น 3 หรือ 5",
             required=True,
@@ -746,12 +746,12 @@ class LeaveModal(discord.ui.Modal):
         self.s_v, self.e_v = s_v, e_v
         
         if not is_f:
-            self.s_i = discord.ui.TextInput(label='เริ่มลาวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 25/04/2026', value=s_v, required=True)
-            self.e_i = discord.ui.TextInput(label='สิ้นสุดวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 30/04/2026', value=e_v, required=True)
+            self.s_i = discord.ui.InputText(label='เริ่มลาวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 25/04/2026', value=s_v, required=True)
+            self.e_i = discord.ui.InputText(label='สิ้นสุดวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 30/04/2026', value=e_v, required=True)
             self.add_item(self.s_i)
             self.add_item(self.e_i)
         
-        self.re = discord.ui.TextInput(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.InputTextStyle.paragraph, value=old_re, required=True)
+        self.re = discord.ui.InputText(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.InputTextStyle.paragraph, value=old_re, required=True)
         self.add_item(self.re)
     
     async def on_submit(self, it: discord.Interaction):
@@ -1554,10 +1554,10 @@ class AdminEditDetailsModal(discord.ui.Modal):
         super().__init__(title="แก้ไขใบลาแบบละเอียด (Admin)")
         self.idx, self.od, self.selected_cat = idx, od, selected_cat
         
-        self.s_i = discord.ui.TextInput(label="วันเริ่มลา (วว/ดด/ปปปป) *ค.ศ.*", value=od['start_date'], required=True)
-        self.e_i = discord.ui.TextInput(label="วันสิ้นสุด (วว/ดด/ปปปป) *ค.ศ.*", value=od['end_date'], required=True)
-        self.re = discord.ui.TextInput(label="เหตุผลการลา", style=discord.InputTextStyle.paragraph, value=od['reason'], required=True)
-        self.admin_re = discord.ui.TextInput(label="หมายเหตุจากแอดมิน (ทำไมถึงแก้?)", placeholder="ระบุเหตุผลเพื่อบันทึกใน Log...", required=True)
+        self.s_i = discord.ui.InputText(label="วันเริ่มลา (วว/ดด/ปปปป) *ค.ศ.*", value=od['start_date'], required=True)
+        self.e_i = discord.ui.InputText(label="วันสิ้นสุด (วว/ดด/ปปปป) *ค.ศ.*", value=od['end_date'], required=True)
+        self.re = discord.ui.InputText(label="เหตุผลการลา", style=discord.InputTextStyle.paragraph, value=od['reason'], required=True)
+        self.admin_re = discord.ui.InputText(label="หมายเหตุจากแอดมิน (ทำไมถึงแก้?)", placeholder="ระบุเหตุผลเพื่อบันทึกใน Log...", required=True)
         
         self.add_item(self.s_i)
         self.add_item(self.e_i)
@@ -1787,7 +1787,7 @@ class CancelReasonModal(discord.ui.Modal):
         super().__init__(title="ระบุเหตุผลการยกเลิก")
         self.target_idx, self.od = target_idx, od
         self.is_admin_request = is_admin_request 
-        self.reason = discord.ui.TextInput(label='เหตุผลที่ยกเลิก', placeholder='ระบุเหตุผลที่นี่...', style=discord.InputTextStyle.paragraph, required=True)
+        self.reason = discord.ui.InputText(label='เหตุผลที่ยกเลิก', placeholder='ระบุเหตุผลที่นี่...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
     
     async def on_submit(self, it: discord.Interaction):
@@ -1952,7 +1952,7 @@ class EditReasonModal(discord.ui.Modal):
     def __init__(self, idx, od, new_end):
         super().__init__(title="ระบุเหตุผลการแก้ไขวันลา")
         self.idx, self.od, self.new_end = idx, od, new_end
-        self.reason = discord.ui.TextInput(label='เหตุผลที่ขอแก้ไข', placeholder='ระบุรายละเอียด...', style=discord.InputTextStyle.paragraph, required=True)
+        self.reason = discord.ui.InputText(label='เหตุผลที่ขอแก้ไข', placeholder='ระบุรายละเอียด...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
     async def on_submit(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
@@ -1980,7 +1980,7 @@ class EditDateModal(discord.ui.Modal):
     def __init__(self, idx, od, parent_it=None):
         super().__init__(title="ระบุวันที่กลับมาจริง")
         self.idx, self.od, self.parent_it = idx, od, parent_it
-        self.new_e = discord.ui.TextInput(label='วันที่กลับมาจริง (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 28/04/2026', required=True)
+        self.new_e = discord.ui.InputText(label='วันที่กลับมาจริง (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 28/04/2026', required=True)
         self.add_item(self.new_e)
 
     async def on_submit(self, it: discord.Interaction):
