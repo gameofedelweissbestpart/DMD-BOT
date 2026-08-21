@@ -1059,29 +1059,29 @@ class AdminPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="📍 ตั้งค่าห้องต่างๆ", style=discord.ButtonStyle.primary, custom_id="admin_room_settings")
-    async def set_l(self, it, b):
-        # เรียกหน้าเลือกหมวดหมู่
+    # 🟢 ลบ custom_id="admin_room_settings" ออก
+    @discord.ui.button(label="📍 ตั้งค่าห้องต่างๆ", style=discord.ButtonStyle.primary)
+    async def set_l(self, it: discord.Interaction, b: discord.ui.Button):
         await it.response.send_message("📂 **เลือกหมวดหมู่ที่ต้องการจัดการ:**", view=CategorySelectionView(), ephemeral=True)
 
-    @discord.ui.button(label="📋 ระบบลา", style=discord.ButtonStyle.primary, custom_id="admin_leave_system_main")
-    async def leave_system(self, it: discord.Interaction, b):
-        # แก้ไขจุดที่มีวงเล็บเปิดค้างไว้ โดยเติมวงเล็บปิดให้สมบูรณ์ที่ท้ายคำสั่ง
+    # 🟢 ลบ custom_id="admin_leave_system_main" ออก
+    @discord.ui.button(label="📋 ระบบลา", style=discord.ButtonStyle.primary)
+    async def leave_system(self, it: discord.Interaction, b: discord.ui.Button):
         await it.response.send_message(
             content="📑 **เมนูจัดการระบบลา:** เลือกการดำเนินการที่ต้องการ", 
             view=AdminLeaveManagementView(), 
             ephemeral=True
         )
 
-# 🟢 เพิ่มปุ่มเรียกใช้งานระบบสุ่มรายชื่อ
-    @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.primary, custom_id="admin_random_system_main")
-    async def random_system(self, it: discord.Interaction, b):
+    # 🟢 ลบ custom_id="admin_random_system_main" ออก
+    @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.primary)
+    async def random_system(self, it: discord.Interaction, b: discord.ui.Button):
         members = [m for m in it.guild.members if not m.bot]
         if not members:
             await it.response.send_message("❌ ไม่พบสมาชิกในเซิร์ฟเวอร์", ephemeral=True)
             return
 
-        view = RandomModeView(author=it.user, members=members) # type: ignore
+        view = RandomModeView(author=it.user, members=members)
         text = (
             "🎲 **__เมนูเลือกรูปแบบการสุ่มรายชื่อ__**\n"
             "กรุณาเลือกรูปแบบการสุ่มที่ต้องการใช้งานด้านล่างครับ:"
