@@ -1875,9 +1875,8 @@ class CancelReasonModal(discord.ui.Modal):
 
                     log_em = discord.Embed(title=log_title, color=log_color)
                     log_em.description = (
-                        f"**👤 สมาชิกที่ลา:** {tn}\n"
+                        f"**👤 สมาชิกที่ลา:** {tn}\n\n"
                         f"{executor_txt}"
-                        f"**📝 รายละเอียดรายการที่ถูกยกเลิก:**\n"
                         f" • **วันที่ลา:** {dr} `({old_data.get('total_days', 1)} วัน)`\n"
                         f" • **ประเภท:** {cat_disp_log}\n"
                         f" • **เหตุผลเดิม:** {old_data.get('reason', '-')}\n\n"
@@ -2181,9 +2180,19 @@ class LeaveMainView(discord.ui.View):
                     "⚠️ *หมายเหตุ: รายการที่ผ่านวันเริ่มลาไปแล้ว ไม่สามารถยกเลิกทั้งใบได้ "
                     "หากคุณกลับมาก่อนกำหนด กรุณาใช้ปุ่ม **'✏️ แก้ไขวันลา'** เพื่อปรับวันสิ้นสุดแทน*"
                 )
-                return await interaction.response.send_message(msg, ephemeral=True)
+                # 🟢 [แก้ไขจุดที่ 1.1] ส่งข้อความและสั่งตั้งเวลาปิดอัตโนมัติภายใน 5 วินาที
+                await interaction.response.send_message(msg, ephemeral=True)
+                await asyncio.sleep(5)
+                try: await interaction.delete_original_response()
+                except: pass
+                return
             else:
-                return await interaction.response.send_message("❌ ไม่พบรายการที่คุณสามารถยกเลิกได้", ephemeral=True)
+                # 🟢 [แก้ไขจุดที่ 1.2] ส่งข้อความและสั่งตั้งเวลาปิดอัตโนมัติภายใน 5 วินาที
+                await interaction.response.send_message("❌ ไม่พบรายการที่คุณสามารถยกเลิกได้", ephemeral=True)
+                await asyncio.sleep(5)
+                try: await interaction.delete_original_response()
+                except: pass
+                return
             
         await interaction.response.send_message("📋 เลือกใบลาของคุณที่จะยกเลิก:", view=SubMenuView(interaction, CancelSelect(opts[:25])), ephemeral=True)
   
@@ -2210,7 +2219,12 @@ class LeaveMainView(discord.ui.View):
                 ))
         
         if not opts: 
-            return await interaction.response.send_message("❌ ไม่พบรายการที่คุณสามารถแก้ไขได้", ephemeral=True)
+            # 🟢 [แก้ไขจุดที่ 2] ส่งข้อความและสั่งตั้งเวลาปิดอัตโนมัติภายใน 5 วินาที
+            await interaction.response.send_message("❌ ไม่พบรายการที่คุณสามารถแก้ไขได้", ephemeral=True)
+            await asyncio.sleep(5)
+            try: await interaction.delete_original_response()
+            except: pass
+            return
             
         await interaction.response.send_message("✏️ เลือกใบลาของคุณที่จะแก้ไข:", view=SubMenuView(interaction, EditLeaveSelect(opts[:25], interaction)), ephemeral=True)
 
