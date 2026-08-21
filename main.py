@@ -301,7 +301,7 @@ class RerollConfirmModal(discord.ui.Modal, title="🔄 ยืนยันกา�
     notice = discord.ui.TextInput(
         label="⚠️ คำเตือนการบันทึกประวัติ",
         style=discord.InputTextStyle.paragraph,
-        default="การกดสุ่มใหม่จะทำการบันทึกชื่อ Display Name ของคุณ รอบการสุ่ม และเวลาปัจจุบันลงในประกาศผลเพื่อความโปร่งใส",
+        value="การกดสุ่มใหม่จะทำการบันทึกชื่อ Display Name ของคุณ รอบการสุ่ม และเวลาปัจจุบันลงในประกาศผลเพื่อความโปร่งใส",
         required=False
     )
 
