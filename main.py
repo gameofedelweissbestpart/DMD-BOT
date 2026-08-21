@@ -261,13 +261,12 @@ class RerollExemptSelectView(discord.ui.View):
         return select_callback
 
     @discord.ui.button(label="✅ ยืนยันสุ่มใหม่", style=discord.ButtonStyle.success, row=2)
-    async def confirm_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def confirm_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
         modal = RerollConfirmModal(self.session, self.selected_exempt_ids, self)
         await interaction.response.send_modal(modal)
 
-    # 🟢 ปรับปุ่มยกเลิกให้ลบเมนูทิ้งทันทีเนียนๆ เหมือนปุ่มปิดเมนู
     @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.danger, row=2)
-    async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def cancel_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
         await interaction.response.defer()
         try: await interaction.delete_original_response()
         except: pass
@@ -278,7 +277,7 @@ class RerollView(discord.ui.View):
         self.session = session
 
     @discord.ui.button(label="🔄 สุ่มใหม่อีกรอบ", style=discord.ButtonStyle.secondary, custom_id="btn_reroll_main")
-    async def reroll_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def reroll_button(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
         is_author = interaction.user.id == self.session.author_id
         is_admin = interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild
 
@@ -433,7 +432,7 @@ class RandomStep2ConfigView(discord.ui.View):
         await interaction.response.edit_message(content=text, view=self)
 
     @discord.ui.button(label="🎲 ระบุตัวเลขและเริ่มสุ่ม", style=discord.ButtonStyle.success, row=2)
-    async def start_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def start_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
         if not self.session.target_channel_id:
             await interaction.response.send_message("⚠️ กรุณาเลือกห้องสำหรับส่งผลประกาศก่อนครับ!", ephemeral=True)
             await asyncio.sleep(5)
@@ -445,7 +444,7 @@ class RandomStep2ConfigView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, row=2)
-    async def back_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def back_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
         if not interaction.guild: return
         view = RandomStep1ExemptView(self.session, interaction.guild)
         role_txt = f"<@&{self.session.selected_role_id}>" if getattr(self.session, 'selected_role_id', None) else "`สมาชิกทุกคน`"
@@ -460,7 +459,7 @@ class RandomStep2ConfigView(discord.ui.View):
         await interaction.response.edit_message(content=text, view=view)
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=2)
-    async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def cancel_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
         await interaction.response.defer()
         try: await interaction.delete_original_response()
         except: pass
@@ -843,10 +842,8 @@ class RetryView(discord.ui.View):
         self.title, self.s, self.e, self.cat, self.t_id, self.is_f, self.re_val = title, s, e, cat, t_id, is_f, re_val
 
     @discord.ui.button(label="📝 แก้ไขข้อมูลอีกครั้ง", style=discord.ButtonStyle.primary)
-    async def retry(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def retry(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับให้ button อยู่ก่อน interaction
         await interaction.response.send_modal(LeaveModal(self.title, self.s, self.e, self.cat, self.t_id, self.is_f, self.re_val))
-        try: await interaction.delete_original_response()
-        except: pass
 
 # --- 4. ส่วน Admin (ปรับหัวข้อหน้าหลักตามสั่ง + หมายเหตุใหม่) ---
 # --- 1. วางทับคลาส ConfirmClearView ---
@@ -855,7 +852,7 @@ class ConfirmClearView(discord.ui.View):
         super().__init__(timeout=None) 
 
     @discord.ui.button(label="⚠️ ยืนยันล้างข้อมูลเก่า (ย้อนหลัง 4 เดือน / 120 วัน)", style=discord.ButtonStyle.success, custom_id="admin_confirm_cleanup_v1") 
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับให้ button ขึ้นก่อน interaction
         await interaction.response.defer(ephemeral=True)
         gid = str(interaction.guild.id)
         path_leaves = get_path(gid, "leaves")
@@ -908,11 +905,12 @@ class ConfirmClearView(discord.ui.View):
         except: pass
 
     @discord.ui.button(label="ยกเลิก", style=discord.ButtonStyle.danger, custom_id="admin_close_cleanup_panel")
-    async def close_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับให้ button อยู่ก่อน interaction
         try:
             await interaction.response.defer()
             await interaction.delete_original_response()
         except: pass
+
 
 # --- คลาส AdminSubChannelSelect (ดรอปดาวน์เลือกห้องแอดมิน ให้อยู่ row=0) ---
 class AdminSubChannelSelect(discord.ui.Select):
@@ -2226,9 +2224,8 @@ class LeaveCategoryView(discord.ui.View):
         else:
             final_cat = self.selected_cats
 
+        # 👈 [แก้ไข] เอาการลบข้อความเดิมออก เพื่อไม่ให้ Token ของแบบฟอร์มหลุด
         await interaction.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, final_cat, self.t_id, self.is_f))
-        try: await interaction.delete_original_response()
-        except: pass
 
     @discord.ui.button(label="🔙 ย้อนกลับไปเลือกวัน", style=discord.ButtonStyle.secondary, row=1)
     async def back_to_date(self, button: discord.ui.Button, interaction: discord.Interaction):
