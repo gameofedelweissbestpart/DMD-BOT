@@ -505,12 +505,12 @@ class RandomStep2ConfigView(discord.ui.View):
                     r = discord.Object(id=self.session.role_tag_id)
                     item.default_values = [r]
 
-    @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.text], placeholder="📢 1. เลือกห้องส่งผลประกาศ (บังคับเลือก)...")
+    @discord.ui.channel_select(channel_types=[discord.ChannelType.text], placeholder="📢 1. เลือกห้องส่งผลประกาศ (บังคับเลือก)...")
     async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect):
         self.session.target_channel_id = select.values[0].id
         await self.update_msg(interaction)
 
-    @discord.ui.select(cls=discord.ui.RoleSelect, placeholder="🔔 2. เลือกยศที่จะแท็กแจ้งเตือน (ไม่เลือกก็ได้)...", min_values=0, max_values=1)
+    @discord.ui.role_select(placeholder="🔔 2. เลือกยศที่จะแท็กแจ้งเตือน (ไม่เลือกก็ได้)...", min_values=0, max_values=1)
     async def role_select(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
         if select.values:
             self.session.role_tag_id = select.values[0].id
@@ -588,13 +588,13 @@ class RandomStep1ExemptView(discord.ui.View):
 
         self.render_member_selects()
 
-    @discord.ui.select(
-        cls=discord.ui.RoleSelect,
+    @discord.ui.role_select(
         placeholder="🏷️ Filter เลือกยศที่ต้องการสุ่ม (ไม่เลือก = สุ่มทุกคน)...",
         min_values=0,
         max_values=1,
         row=0
     )
+
     async def role_filter_select(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
         if select.values:
             selected_role = select.values[0]
@@ -1267,7 +1267,7 @@ class AdminWeaponManageView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=300)
 
-    @discord.ui.select(cls=discord.ui.UserSelect, placeholder="👤 เลือกสมาชิกที่ต้องการใส่ในสล็อต...")
+    @discord.ui.user_select(placeholder="👤 เลือกสมาชิกที่ต้องการใส่ในสล็อต...")
     async def select_user(self, interaction: discord.Interaction, select: discord.ui.UserSelect):
         member = select.values[0]
         await interaction.response.send_modal(AdminSlotAssignModal(member))
@@ -1303,7 +1303,7 @@ class WeaponChannelSetupView(discord.ui.View):
         self.selected_log_ch = "disabled"
         self.add_item(WeaponLogChannelSelect(guild))
 
-    @discord.ui.select(cls=discord.ui.ChannelSelect, placeholder="📍 เลือกห้องสำหรับแสดงบอร์ดอาวุธ...", channel_types=[discord.ChannelType.text])
+    @discord.ui.channel_select(placeholder="📍 เลือกห้องสำหรับแสดงบอร์ดอาวุธ...", channel_types=[discord.ChannelType.text])
     async def select_board_channel(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect):
         self.selected_board_ch = select.values[0]
         await interaction.response.defer()
