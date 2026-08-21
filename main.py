@@ -2674,40 +2674,35 @@ async def backup(ctx):
         await ctx.send("❌ **ไม่สามารถส่งไฟล์ได้!** โปรดเปิดการรับข้อความจาก DM (Private Message) ก่อนครับ")
 
 # 🟢 เพิ่ม Slash Command /random สำหรับเปิดเมนูสุ่มได้โดยตรงทุกๆ คน
-@bot.tree.command(name="random", description="🎲 เปิดเมนูสุ่มรายชื่อสมาชิก / จัดทีม (ใช้งานได้ทุกคน)")
-async def random_slash_cmd(interaction: discord.Interaction):
-    if not interaction.guild:
-        await interaction.response.send_message("❌ คำสั่งนี้สามารถใช้งานได้ในเซิร์ฟเวอร์เท่านั้น", ephemeral=True)
+@bot.slash_command(name="random", description="🎲 เปิดเมนูสุ่มรายชื่อสมาชิก / จัดทีม (ใช้งานได้ทุกคน)")
+async def random_slash_cmd(ctx: discord.ApplicationContext):
+    if not ctx.guild:
+        await ctx.respond("❌ คำสั่งนี้สามารถใช้งานได้ในเซิร์ฟเวอร์เท่านั้น", ephemeral=True)
         return
 
-    members = [m for m in interaction.guild.members if not m.bot]
+    members = [m for m in ctx.guild.members if not m.bot]
     if not members:
         try:
-            fetched_members = [m async for m in interaction.guild.fetch_members(limit=None)]
+            fetched_members = [m async for m in ctx.guild.fetch_members(limit=None)]
             members = [m for m in fetched_members if not m.bot]
         except:
             pass
 
     if not members:
-        await interaction.response.send_message("❌ ไม่พบสมาชิกในเซิร์ฟเวอร์", ephemeral=True)
+        await ctx.respond("❌ ไม่พบสมาชิกในเซิร์ฟเวอร์", ephemeral=True)
         return
 
-    view = RandomModeView(author=interaction.user, members=members)
+    view = RandomModeView(author=ctx.author, members=members) # type: ignore
     text = (
         "🎲 **__เมนูเลือกรูปแบบการสุ่มรายชื่อ__**\n"
         "กรุณาเลือกรูปแบบการสุ่มที่ต้องการใช้งานด้านล่างครับ:"
     )
-    await interaction.response.send_message(content=text, view=view, ephemeral=True)
+    await ctx.respond(content=text, view=view, ephemeral=True)
 
 
 # --- ย้าย on_ready มาไว้ท้ายสุด และใส่ add_view ให้ครบ ---
 @bot.event
 async def on_ready():
-    # Sync Slash Commands ทั้งหมด (เช่น /random)
-    try:
-        await bot.tree.sync()
-    except Exception as e:
-        print(f"Failed to sync slash commands: {e}")
         
     # ลงทะเบียน View ทั้งหมดเพื่อให้ปุ่มทำงานได้ตลอดกาล (Persistent Views)
     bot.add_view(LeaveMainView())             # หน้าหลักแจ้งลา
