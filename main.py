@@ -186,11 +186,12 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
 
 # --- [แก้ไขจุดที่ 1: คลาส RerollConfirmModal] ---
 class RerollConfirmModal(discord.ui.Modal):
-    def __init__(self, session: RandomSession, selected_exempt_ids: List[int], parent_view: discord.ui.View, parent_msg: Optional[discord.Message] = None):
+    def __init__(self, session: RandomSession, selected_exempt_ids: List[int], parent_view: discord.ui.View, parent_it: Optional[discord.Interaction] = None, parent_msg: Optional[discord.Message] = None):
         super().__init__(title="🔄 ยืนยันการสุ่มใหม่อีกรอบ")
         self.session = session
         self.selected_exempt_ids = selected_exempt_ids
         self.parent_view = parent_view
+        self.parent_it = parent_it # 🟢 เพิ่มการรับ parent_it เพื่อสั่งปิดข้อความ Ephemeral
         self.parent_msg = parent_msg # รับ Message ของเมนูตั้งค่าเดิมมาลบทิ้ง
 
         self.notice = discord.ui.InputText(
@@ -206,8 +207,11 @@ class RerollConfirmModal(discord.ui.Modal):
         self.session.round_count += 1
         new_embed = generate_random_result(self.session, self.selected_exempt_ids, interaction.user)
         
-        # สั่งลบข้อความเมนูเลือกคนยกเว้นเดิมออกทันที
-        if self.parent_msg:
+        # 🟢 สั่งปิดข้อความเมนูเลือกคนยกเว้นเดิม (Ephemeral) ออกทันที
+        if self.parent_it:
+            try: await self.parent_it.delete_original_response()
+            except: pass
+        elif self.parent_msg:
             try: await self.parent_msg.delete()
             except: pass
 
@@ -266,8 +270,8 @@ class RerollExemptSelectView(discord.ui.View):
 
     @discord.ui.button(label="✅ ยืนยันสุ่มใหม่", style=discord.ButtonStyle.success, row=2)
     async def confirm_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # ส่ง interaction.message เข้า Modal
-        modal = RerollConfirmModal(self.session, self.selected_exempt_ids, self, parent_msg=interaction.message)
+        # 🟢 ส่ง interaction (parent_it) เข้า Modal เพื่อสั่งปิดข้อความ Ephemeral หลังสุ่มเสร็จ
+        modal = RerollConfirmModal(self.session, self.selected_exempt_ids, self, parent_it=interaction, parent_msg=interaction.message)
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.danger, row=2)
@@ -275,6 +279,7 @@ class RerollExemptSelectView(discord.ui.View):
         await interaction.response.defer()
         try: await interaction.delete_original_response()
         except: pass
+
 
 class RerollView(discord.ui.View):
     def __init__(self, session: RandomSession):
@@ -314,10 +319,11 @@ class RerollView(discord.ui.View):
                 pass
 
 class RandomNumberInputModal(discord.ui.Modal):
-    def __init__(self, session: RandomSession, parent_msg: Optional[discord.Message] = None):
+    def __init__(self, session: RandomSession, parent_it: Optional[discord.Interaction] = None, parent_msg: Optional[discord.Message] = None):
         title_text = "ระบุจำนวนคน" if session.mode == "single" else "ระบุจำนวนคนต่อทีม"
         super().__init__(title=f"🎲 {title_text}")
         self.session = session
+        self.parent_it = parent_it # 🟢 เพิ่มการรับ parent_it เพื่อสั่งปิดข้อความ Ephemeral
         self.parent_msg = parent_msg # รับ Message เมนูขั้นตอนที่ 2 มาลบทิ้ง
 
         label_text = "พิมพ์จำนวนคนที่ต้องการสุ่ม:" if session.mode == "single" else "พิมพ์จำนวนคนต่อ 1 ทีม:"
@@ -348,8 +354,11 @@ class RandomNumberInputModal(discord.ui.Modal):
 
         self.session.count_num = val
 
-        # ลบหน้าเมนูขั้นตอนที่ 2 ออกทันที
-        if self.parent_msg:
+        # 🟢 สั่งปิดหน้าเมนูขั้นตอนที่ 2 (Ephemeral) ออกทันที
+        if self.parent_it:
+            try: await self.parent_it.delete_original_response()
+            except: pass
+        elif self.parent_msg:
             try: await self.parent_msg.delete()
             except: pass
 
@@ -382,10 +391,6 @@ class RandomNumberInputModal(discord.ui.Modal):
         try: await followup_msg.delete()
         except: pass
 
-    async def on_submit(self, interaction: discord.Interaction):
-        await self.callback(interaction)
-
-    # ผูกฟังก์ชันไว้รองรับทั้งสองแบบ
     async def on_submit(self, interaction: discord.Interaction):
         await self.callback(interaction)
 
@@ -452,8 +457,8 @@ class RandomStep2ConfigView(discord.ui.View):
             except: pass
             return
 
-        # ส่ง interaction.message เข้า Modal เพื่อให้นำไปลบทิ้ง
-        modal = RandomNumberInputModal(self.session, parent_msg=interaction.message)
+        # 🟢 ส่ง interaction (parent_it) เข้า Modal เพื่อให้สั่งปิดข้อความ Ephemeral หลังกรอกตัวเลข
+        modal = RandomNumberInputModal(self.session, parent_it=interaction, parent_msg=interaction.message)
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, row=2)
@@ -756,10 +761,11 @@ class RealtimeRefreshView(discord.ui.View):
 
 # --- 3. ระบบแจ้งลาและ Log (บังคับ ค.ศ. / ลาไม่เกิน 15 วัน / แยกสี Log) ---
 class LeaveModal(discord.ui.Modal):
-    def __init__(self, title, s_v, e_v, cat_val, t_id=None, is_f=False, old_re="", parent_msg: Optional[discord.Message] = None):
+    def __init__(self, title, s_v, e_v, cat_val, t_id=None, is_f=False, old_re="", parent_it: Optional[discord.Interaction] = None, parent_msg: Optional[discord.Message] = None):
         super().__init__(title=title)
         self.t_id, self.is_f, self.cat_val = t_id, is_f, cat_val
         self.s_v, self.e_v = s_v, e_v
+        self.parent_it = parent_it # 🟢 รับ parent_it เพื่อสั่งปิดข้อความ Ephemeral
         self.parent_msg = parent_msg # รับ Message ของเมนูเลือกประเภทการลามาลบทิ้ง
         
         if not is_f:
@@ -791,8 +797,11 @@ class LeaveModal(discord.ui.Modal):
         try:
             await it.response.defer(ephemeral=True)
             
-            # ลบเมนูเลือกประเภทการลาเดิมออกจากหน้าจอ
-            if self.parent_msg:
+            # 🟢 ปิดเมนูเลือกประเภทการลาเดิม (Ephemeral) ออกจากหน้าจอ
+            if self.parent_it:
+                try: await self.parent_it.delete_original_response()
+                except: pass
+            elif self.parent_msg:
                 try: await self.parent_msg.delete()
                 except: pass
 
@@ -1557,14 +1566,15 @@ class AdminEditCategorySelect(discord.ui.Select):
         else:
             final_cat = selected_cats
         
-        # ส่ง it.message เข้า Modal เพื่อลบทิ้งหลังแอดมินแก้ไขสำเร็จ
-        await it.response.send_modal(AdminEditDetailsModal(self.idx, self.od, final_cat, parent_msg=it.message))
+        # 🟢 ส่ง it (parent_it) เข้า Modal เพื่อปิดข้อความเลือกหมวดหมู่ทันทีหลังบันทึกสำเร็จ
+        await it.response.send_modal(AdminEditDetailsModal(self.idx, self.od, final_cat, parent_it=it, parent_msg=it.message))
 
 # --- แก้ไข Logic ใน AdminEditDetailsModal (คำเดิม 100% + เพิ่มเงื่อนไข (คงเดิม)) ---
 class AdminEditDetailsModal(discord.ui.Modal):
-    def __init__(self, idx, od, selected_cat, parent_msg: Optional[discord.Message] = None):
+    def __init__(self, idx, od, selected_cat, parent_it: Optional[discord.Interaction] = None, parent_msg: Optional[discord.Message] = None):
         super().__init__(title="แก้ไขใบลาแบบละเอียด (Admin)")
         self.idx, self.od, self.selected_cat = idx, od, selected_cat
+        self.parent_it = parent_it # 🟢 เพิ่มการรับ parent_it เพื่อสั่งปิดข้อความ Ephemeral
         self.parent_msg = parent_msg
         
         self.s_i = discord.ui.InputText(label="วันเริ่มลา (วว/ดด/ปปปป) *ค.ศ.*", value=od['start_date'], required=True)
@@ -1579,7 +1589,11 @@ class AdminEditDetailsModal(discord.ui.Modal):
 
     async def callback(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
-        if self.parent_msg:
+        # 🟢 สั่งปิดข้อความเลือกหมวดหมู่ฝั่งแอดมิน (Ephemeral) ออกทันที
+        if self.parent_it:
+            try: await self.parent_it.delete_original_response()
+            except: pass
+        elif self.parent_msg:
             try: await self.parent_msg.delete()
             except: pass
 
@@ -1794,10 +1808,11 @@ async def daily_report_error(error):
 # --- 6. ระบบยกเลิกใบลา (ฉบับปรับปรุง: เพิ่มการเก็บบันทึกข้อมูลยกเลิกใบลาลงไฟล์ (cancelled_leaves.json) ---
 # โดยเพิ่มคำสั่งบันทึกรายการที่ถูกยกเลิก พร้อมลงเวลา cancelled_at เพื่อดึงมาแสดงผล
 class CancelReasonModal(discord.ui.Modal):
-    def __init__(self, target_idx, od, is_admin_request=False, parent_msg: Optional[discord.Message] = None): 
+    def __init__(self, target_idx, od, is_admin_request=False, parent_it: Optional[discord.Interaction] = None, parent_msg: Optional[discord.Message] = None): 
         super().__init__(title="ระบุเหตุผลการยกเลิก")
         self.target_idx, self.od = target_idx, od
         self.is_admin_request = is_admin_request 
+        self.parent_it = parent_it # 🟢 เพิ่มการรับ parent_it เพื่อสั่งปิดข้อความ Ephemeral
         self.parent_msg = parent_msg # รับ Message เมนูยืนยันมาลบทิ้ง
         self.reason = discord.ui.InputText(label='เหตุผลที่ยกเลิก', placeholder='ระบุเหตุผลที่นี่...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
@@ -1805,8 +1820,11 @@ class CancelReasonModal(discord.ui.Modal):
     async def callback(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
         
-        # สั่งลบข้อความสอบถามยืนยันการยกเลิกทิ้ง
-        if self.parent_msg:
+        # 🟢 สั่งปิดข้อความสอบถามยืนยันการยกเลิก (Ephemeral) ทิ้งทันที
+        if self.parent_it:
+            try: await self.parent_it.delete_original_response()
+            except: pass
+        elif self.parent_msg:
             try: await self.parent_msg.delete()
             except: pass
 
@@ -1884,8 +1902,8 @@ class ConfirmCancelView(discord.ui.View):
 
     @discord.ui.button(label="✅ ยืนยันการยกเลิก", style=discord.ButtonStyle.success)
     async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # ส่ง interaction.message เข้า Modal เพื่อลบทิ้งหลังยกเลิกสำเร็จ
-        await interaction.response.send_modal(CancelReasonModal(self.target_idx, self.od, is_admin_request=False, parent_msg=interaction.message))
+        # 🟢 ส่ง interaction (parent_it) เข้า Modal เพื่อปิดข้อความยืนยันเมื่อทำการยกเลิกสำเร็จ
+        await interaction.response.send_modal(CancelReasonModal(self.target_idx, self.od, is_admin_request=False, parent_it=interaction, parent_msg=interaction.message))
 
     @discord.ui.button(label="❌ ไม่ยกเลิกแล้ว", style=discord.ButtonStyle.danger)
     async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -1969,16 +1987,21 @@ async def process_edit_leave(it, idx, od, new_end_str, edit_reason="-"):
             pass
 
 class EditReasonModal(discord.ui.Modal):
-    def __init__(self, idx, od, new_end, parent_msg: Optional[discord.Message] = None):
+    def __init__(self, idx, od, new_end, parent_it: Optional[discord.Interaction] = None, parent_msg: Optional[discord.Message] = None):
         super().__init__(title="ระบุเหตุผลการแก้ไขวันลา")
         self.idx, self.od, self.new_end = idx, od, new_end
+        self.parent_it = parent_it # 🟢 เพิ่มการรับ parent_it เพื่อสั่งปิดข้อความ Ephemeral
         self.parent_msg = parent_msg # รับ Message เมนูก่อนหน้ามาลบทิ้ง
         self.reason = discord.ui.InputText(label='เหตุผลที่ขอแก้ไข', placeholder='ระบุรายละเอียด...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
 
     async def callback(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
-        if self.parent_msg:
+        # 🟢 สั่งปิดข้อความยืนยันการแก้ไขวันลา (Ephemeral) ออกทันที
+        if self.parent_it:
+            try: await self.parent_it.delete_original_response()
+            except: pass
+        elif self.parent_msg:
             try: await self.parent_msg.delete()
             except: pass
         await process_edit_leave(it, self.idx, self.od, self.new_end, self.reason.value)
@@ -2053,8 +2076,8 @@ class ConfirmEditView(discord.ui.View):
 
     @discord.ui.button(label="✅ ยืนยันการแก้ไข", style=discord.ButtonStyle.success)
     async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # ส่ง interaction.message เข้า Modal
-        await interaction.response.send_modal(EditReasonModal(self.idx, self.od, self.new_end, parent_msg=interaction.message))
+        # 🟢 ส่ง interaction (parent_it) เข้า Modal
+        await interaction.response.send_modal(EditReasonModal(self.idx, self.od, self.new_end, parent_it=interaction, parent_msg=interaction.message))
 
     @discord.ui.button(label="📅 เลือกวันใหม่", style=discord.ButtonStyle.primary)
     async def reselect(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -2299,8 +2322,8 @@ class LeaveCategoryView(discord.ui.View):
         else:
             final_cat = self.selected_cats
 
-        # ส่ง interaction.message เข้า Modal เพื่อลบทิ้งเมื่อส่งใบลาสำเร็จ
-        await interaction.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, final_cat, self.t_id, self.is_f, parent_msg=interaction.message))
+        # 🟢 ส่ง interaction (parent_it) เข้า Modal เพื่อปิดข้อความส่วนตัวเมื่อส่งใบลาสำเร็จ
+        await interaction.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, final_cat, self.t_id, self.is_f, parent_it=interaction, parent_msg=interaction.message))
 
     @discord.ui.button(label="🔙 ย้อนกลับไปเลือกวัน", style=discord.ButtonStyle.secondary, row=1)
     async def back_to_date(self, button: discord.ui.Button, interaction: discord.Interaction):
