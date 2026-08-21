@@ -1201,26 +1201,7 @@ class MonthlyUserSelect(discord.ui.Select):
         
         await it.edit_original_response(embed=em, view=MonthlyDetailView(self.guild_obj, self.year, self.month))
 
-# 🟢 2. คลาส MonthlyOverviewView (ปุ่มปิดเมนูอยู่ row=4)
-# 🟢 1. รวมปุ่มทั้งสองไว้ใน MonthlyOverviewView และเรียงลำดับ ซ้าย -> ขวา
-class MonthlyOverviewView(discord.ui.View):
-    def __init__(self, guild, year, month):
-        super().__init__(timeout=600)
-        self.guild = guild
-        self.year = year
-        self.month = month
 
-    @discord.ui.button(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary, row=4)
-    async def reselect_month(self, it: discord.Interaction, b: discord.ui.Button):
-        await send_month_selection(it)
-
-    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=4)
-    async def close_menu(self, it: discord.Interaction, b: discord.ui.Button):
-        await it.response.defer()
-        try:
-            await it.delete_original_response()
-        except:
-            pass
 
 # 🟢 3. ฟังก์ชันสร้างหน้าสรุป (เพิ่ม Dropdown ให้ครบก่อน แล้วค่อยใส่ปุ่มต่อท้าย)
 async def generate_and_send_monthly_overview(it: discord.Interaction, guild, year, month):
