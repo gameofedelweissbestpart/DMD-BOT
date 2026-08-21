@@ -1024,11 +1024,11 @@ class AdminPanelView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="📍 ตั้งค่าห้องต่างๆ", style=discord.ButtonStyle.primary, custom_id="admin_panel_set_l_btn")
-    async def set_l(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def set_l(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.send_message("📂 **เลือกหมวดหมู่ที่ต้องการจัดการ:**", view=CategorySelectionView(), ephemeral=True)
 
     @discord.ui.button(label="📋 ระบบลา", style=discord.ButtonStyle.primary, custom_id="admin_panel_leave_sys_btn")
-    async def leave_system(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def leave_system(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.send_message(
             content="📑 **เมนูจัดการระบบลา:** เลือกการดำเนินการที่ต้องการ", 
             view=AdminLeaveManagementView(), 
@@ -1036,7 +1036,7 @@ class AdminPanelView(discord.ui.View):
         )
 
     @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.primary, custom_id="admin_panel_random_sys_btn")
-    async def random_system(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def random_system(self, button: discord.ui.Button, interaction: discord.Interaction):
         members = [m for m in interaction.guild.members if not m.bot]
         if not members:
             await interaction.response.send_message("❌ ไม่พบสมาชิกในเซิร์ฟเวอร์", ephemeral=True)
