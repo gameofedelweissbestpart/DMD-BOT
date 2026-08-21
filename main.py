@@ -323,32 +323,29 @@ class RandomNumberInputModal(discord.ui.Modal):
         )
         self.add_item(self.num_input)
 
-    async def on_submit(self, interaction: discord.Interaction):
+    # 🔴 [แก้ไขจุดสำคัญ] เปลี่ยนชื่อฟังก์ชันเป็น callback และใส่ defer() บรรทัดแรกสุด
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True) # ตอบรับทันทีเพื่อปิดหน้าต่าง Modal
+        
         try:
             val = int(self.num_input.value)
             if val <= 0: raise ValueError()
         except ValueError:
-            # 🔴 [แก้ไข] ไม่ใช้ delete_original_response หลังส่งข้อความเตือน เพื่อป้องกัน Token หลุด
-            return await interaction.response.send_message("❌ กรุณากรอกตัวเลขจำนวนเต็มที่มากกว่า 0 เท่านั้น", ephemeral=True)
+            return await interaction.followup.send("❌ กรุณากรอกตัวเลขจำนวนเต็มที่มากกว่า 0 เท่านั้น", ephemeral=True)
 
         available_count = len([m for m in self.session.members if m.id not in self.session.exempt_ids])
         
         if self.session.mode == "single" and val > available_count:
-            # 🔴 [แก้ไข] ไม่ใช้ delete_original_response หลังส่งข้อความเตือน เพื่อป้องกัน Token หลุด
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 f"⚠️ **จำนวนคนไม่เพียงพอ!**\nมีสมาชิกพร้อมสุ่มทั้งหมด {available_count} คน (ไม่รวมคนยกเว้น) แต่คุณระบุ {val} คน",
                 ephemeral=True
             )
 
         self.session.count_num = val
-        await interaction.response.defer(ephemeral=True)
 
-        # 🔴 [แก้ไข] ลบเมนูตั้งค่าเดิมผ่าน interaction.message แทนการใช้ delete_original_response() ที่ทำให้ Modal ขึ้น Error
         if interaction.message:
-            try:
-                await interaction.message.delete()
-            except:
-                pass
+            try: await interaction.message.delete()
+            except: pass
 
         embed = generate_random_result(self.session, [], interaction.user)
         
@@ -370,7 +367,6 @@ class RandomNumberInputModal(discord.ui.Modal):
         self.session.message_id = sent_msg.id
         ACTIVE_RANDOM_SESSIONS[sent_msg.id] = self.session
 
-        # 🟢 [แก้ไขเดิม] ส่งข้อความแจ้งเตือนพร้อมลิ้งก์ -> ค้างไว้ 10 วินาทีแล้วลบ
         followup_msg = await interaction.followup.send(
             f"✅ **ดำเนินการสุ่มและประกาศผลเรียบร้อยแล้ว!**\n➔ คลิกเพื่อไปยังห้องประกาศ: {sent_msg.jump_url}",
             ephemeral=True
@@ -379,6 +375,10 @@ class RandomNumberInputModal(discord.ui.Modal):
         await asyncio.sleep(10)
         try: await followup_msg.delete()
         except: pass
+
+    # ผูกฟังก์ชันไว้รองรับทั้งสองแบบ
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.callback(interaction)
 
 # --- คลาส RandomStep2ConfigView (ตั้งค่าห้องส่งผลและยศ row=0 และ row=1, ปุ่มกด row=2 อยู่ด้านล่าง) ---
 class RandomStep2ConfigView(discord.ui.View):
@@ -755,7 +755,6 @@ class LeaveModal(discord.ui.Modal):
         self.s_v, self.e_v = s_v, e_v
         
         if not is_f:
-            # 🔴 [แก้ไข] ใช้ None กรณีค่าว่าง เพื่อไม่ให้ส่ง value="" เข้า Discord API
             self.s_i = discord.ui.InputText(
                 label='เริ่มลาวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', 
                 placeholder='ตัวอย่าง: 25/04/2026', 
@@ -771,7 +770,6 @@ class LeaveModal(discord.ui.Modal):
             self.add_item(self.s_i)
             self.add_item(self.e_i)
         
-        # 🔴 [แก้ไข] ใช้ None กรณีค่าว่าง เพื่อไม่ให้ส่ง value="" เข้า Discord API
         self.re = discord.ui.InputText(
             label='เหตุผลการลา', 
             placeholder='ระบุรายละเอียดเพิ่มเติม...', 
@@ -781,14 +779,13 @@ class LeaveModal(discord.ui.Modal):
         )
         self.add_item(self.re)
     
-    async def on_submit(self, it: discord.Interaction):
-        # 🔴 [แก้ไข] ครอบ try...except ตั้งแต่เริ่มฟังก์ชัน รวม defer() เพื่อดัก Error ไม่ให้ป๊อปอัปเด้งข้อผิดพลาด
+    # 🔴 [แก้ไขจุดสำคัญ] เปลี่ยนชื่อฟังก์ชันเป็น callback และใส่ defer() บรรทัดแรกสุด
+    async def callback(self, it: discord.Interaction):
         try:
-            await it.response.defer(ephemeral=True)
+            await it.response.defer(ephemeral=True) # ตอบรับทันทีเพื่อปิดหน้าต่าง Modal
             
             gid = str(it.guild.id) if it.guild else "0"
             
-            # 🔴 [แก้ไข] เช็กความปลอดภัยก่อนเรียก .strip() ป้องกัน AttributeError
             s = self.s_v if self.is_f else (self.s_i.value.strip() if self.s_i.value else "")
             e = self.e_v if self.is_f else (self.e_i.value.strip() if self.e_i.value else "")
             re_val = self.re.value.strip() if self.re.value else "-"
@@ -812,7 +809,6 @@ class LeaveModal(discord.ui.Modal):
 
             target_uid = self.t_id if self.t_id else str(it.user.id)
             
-            # --- บันทึกข้อมูลแยกไฟล์ตาม Guild ID ---
             d = load_data(gid, "leaves", [])
             d.append({
                 "user_id": str(it.user.id),
@@ -826,14 +822,10 @@ class LeaveModal(discord.ui.Modal):
             })
             save_data(gid, "leaves", d)
             
-            # 🔴 [แก้ไข] แยก try...except การอัปเดตบอร์ด Real-time ไม่ให้กระทบการบันทึกหลัก
             if it.guild:
-                try:
-                    await update_summary_board(it.guild) 
-                except Exception as board_err:
-                    print(f"⚠️ Warning: update_summary_board failed: {board_err}")
+                try: await update_summary_board(it.guild) 
+                except Exception as board_err: print(f"⚠️ Warning: update_summary_board failed: {board_err}")
 
-            # --- ส่ง Log การแจ้งลา ---
             cfg = load_data(gid, "config", {})
             log_ch_id = cfg.get("log_ch")
             
@@ -872,11 +864,13 @@ class LeaveModal(discord.ui.Modal):
             except: pass
 
         except Exception as e:
-            print(f"❌ Error in LeaveModal on_submit: {e}")
-            try:
-                await it.followup.send(content=f"❌ **เกิดข้อผิดพลาดในการบันทึกข้อมูล:** `{e}`\nโปรดลองใหม่อีกครั้ง หรือแจ้งแอดมิน", ephemeral=True)
-            except:
-                pass
+            print(f"❌ Error in LeaveModal callback: {e}")
+            try: await it.followup.send(content=f"❌ **เกิดข้อผิดพลาดในการบันทึกข้อมูล:** `{e}`", ephemeral=True)
+            except: pass
+
+    # ผูกฟังก์ชันไว้รองรับทั้งสองแบบ
+    async def on_submit(self, it: discord.Interaction):
+        await self.callback(it)
 
 class RetryView(discord.ui.View):
     def __init__(self, title, s, e, cat, t_id, is_f, re_val):
