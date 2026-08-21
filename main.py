@@ -1040,11 +1040,6 @@ class AdminCatSelect(discord.ui.Select):
         cat_final = self.values[0]
         await it.response.edit_message(content=f"🎯 กำลังตั้งค่า: **{cat_final}**", view=AdminSubMenuView(cat_final))
 
-# --- Class สำหรับเป็นหน้ากาก (Container) ให้ Dropdown เลือกหัวข้อ ---
-class SubMenuView(discord.ui.View):
-    def __init__(self, it, select_item):
-        super().__init__(timeout=120)
-        self.add_item(select_item)
 
 # --- ส่วนที่ 1: หน้าเลือกเลือกระบบ (ลา หรือ ปรับเงิน) ---
 class CategorySelectionView(discord.ui.View):
@@ -1533,6 +1528,8 @@ class AdminFinalActionView(discord.ui.View):
             view=AdminLeaveManagementView()
         )
 
+
+# --- [จุดที่ 1: กำหนด row=0 ให้ดรอปดาวน์อยู่บนปุ่มย้อนกลับ และคง # เดิมไว้ครบถ้วน] ---
 class AdminEditCategoryView(discord.ui.View):
     def __init__(self, idx, od, opts):
         super().__init__(timeout=300)
@@ -1555,7 +1552,8 @@ class AdminEditCategorySelect(discord.ui.Select):
             min_values=1,
             max_values=len(opts),
             options=opts, 
-            custom_id="admin_category_select_dropdown"
+            custom_id="admin_category_select_dropdown",
+            row=0  # 🟢 [แก้ไข] บังคับให้อยู่ row=0 เพื่อให้อยู่ด้านบนปุ่มย้อนกลับเสมอ
         )
         self.idx, self.od = idx, od
     
@@ -1646,6 +1644,7 @@ class AdminEditDetailsModal(discord.ui.Modal):
             save_data(gid, "leaves", d) 
             await update_summary_board(it.guild)
             
+            # --- [จุดที่ 2: เปลี่ยนชื่อตัวแปรที่ส่งใน log_ch.send เป็น em] ---
             cfg = load_data(gid, "config", {}) 
             log_ch_id = cfg.get("log_ch")
             if log_ch_id:
@@ -1667,7 +1666,8 @@ class AdminEditDetailsModal(discord.ui.Modal):
                         f"{LONG_SEP}"
                     )
                     em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
-                    await log_ch.send(embed=log_em)
+                    # 🟢 [แก้ไข] เปลี่ยนจาก embed=log_em เป็น embed=em เพื่อป้องกัน NameError
+                    await log_ch.send(embed=em)
 
             msg_edited = await it.followup.send(content="✅ อัปเดตข้อมูลใบลาเรียบร้อยแล้ว!", ephemeral=True)       
             await asyncio.sleep(3) 
@@ -2351,17 +2351,18 @@ class LeaveCategoryView(discord.ui.View):
         try: await interaction.delete_original_response()
         except: pass
 
-    @discord.ui.button(label="🔙 ย้อนกลับไปเลือกวัน", style=discord.ButtonStyle.secondary, row=1)
-    async def back_to_date(self, button: discord.ui.Button, interaction: discord.Interaction):
-        prefix = f"🎯 **ลาแทนคุณ:** <@{self.t_id}>\n" if self.t_id else ""
-        txt = f"{prefix}👉 **กรุณาเลือกวันที่ลาด้านล่าง:**"
-        await interaction.response.edit_message(content=txt, view=DateSelectView(t_id=self.t_id))
+# 🟢 [แก้ไข] ใส่ # คอมเมนต์ปิดปุ่มชุดล่างไว้ (ไม่ลบโค้ดออก)
+#   @discord.ui.button(label="🔙 ย้อนกลับไปเลือกวัน", style=discord.ButtonStyle.secondary, row=1)
+#   async def back_to_date(self, button: discord.ui.Button, interaction: discord.Interaction):
+#       prefix = f"🎯 **ลาแทนคุณ:** <@{self.t_id}>\n" if self.t_id else ""
+#       txt = f"{prefix}👉 **กรุณาเลือกวันที่ลาด้านล่าง:**"
+#       await interaction.response.edit_message(content=txt, view=DateSelectView(t_id=self.t_id))
 
-    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
-    async def cls(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await interaction.response.defer()
-        try: await interaction.delete_original_response()
-        except: pass
+#   @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
+#   async def cls(self, button: discord.ui.Button, interaction: discord.Interaction):
+#       await interaction.response.defer()
+#       try: await interaction.delete_original_response()
+#       except: pass
 
 
 @bot.command()
