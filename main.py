@@ -382,6 +382,7 @@ class RandomNumberInputModal(discord.ui.Modal):
         except: pass
 
 # --- คลาส RandomStep2ConfigView (ตั้งค่าห้องส่งผลและยศ row=0 และ row=1, ปุ่มกด row=2 อยู่ด้านล่าง) ---
+# --- คลาส RandomStep2ConfigView (ตั้งค่าห้องส่งผลและยศ row=0 และ row=1, ปุ่มกด row=2 อยู่ด้านล่าง) ---
 class RandomStep2ConfigView(discord.ui.View):
     def __init__(self, session: RandomSession):
         super().__init__(timeout=300)
@@ -389,22 +390,26 @@ class RandomStep2ConfigView(discord.ui.View):
 
         if self.session.target_channel_id:
             for item in self.children:
-                if isinstance(item, discord.ui.ChannelSelect):
+                # 🔴 [แก้ไข] เปลี่ยนจาก isinstance(item, discord.ui.ChannelSelect) เพื่อป้องกัน TypeError ใน Pycord
+                if getattr(item, "type", None) == discord.ComponentType.channel_select:
                     ch = discord.Object(id=self.session.target_channel_id)
                     item.default_values = [ch]
         if self.session.role_tag_id:
             for item in self.children:
-                if isinstance(item, discord.ui.RoleSelect):
+                # 🔴 [แก้ไข] เปลี่ยนจาก isinstance(item, discord.ui.RoleSelect) เพื่อป้องกัน TypeError ใน Pycord
+                if getattr(item, "type", None) == discord.ComponentType.role_select:
                     r = discord.Object(id=self.session.role_tag_id)
                     item.default_values = [r]
 
+    # 🔴 [แก้ไข] สลับลำดับเอา select ขึ้นก่อน interaction (self, select, interaction)
     @discord.ui.select(select_type=discord.ComponentType.channel_select, channel_types=[discord.ChannelType.text], placeholder="📢 1. เลือกห้องส่งผลประกาศ (บังคับเลือก)...", row=0)
-    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+    async def channel_select(self, select: discord.ui.Select, interaction: discord.Interaction):
         self.session.target_channel_id = select.values[0].id
         await self.update_msg(interaction)
 
+    # 🔴 [แก้ไข] สลับลำดับเอา select ขึ้นก่อน interaction (self, select, interaction)
     @discord.ui.select(select_type=discord.ComponentType.role_select, placeholder="🔔 2. เลือกยศที่จะแท็กแจ้งเตือน (ไม่เลือกก็ได้)...", min_values=0, max_values=1, row=1)
-    async def role_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+    async def role_select(self, select: discord.ui.Select, interaction: discord.Interaction):
         if select.values:
             self.session.role_tag_id = select.values[0].id
         else:
@@ -432,7 +437,7 @@ class RandomStep2ConfigView(discord.ui.View):
         await interaction.response.edit_message(content=text, view=self)
 
     @discord.ui.button(label="🎲 ระบุตัวเลขและเริ่มสุ่ม", style=discord.ButtonStyle.success, row=2)
-    async def start_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
+    async def start_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไขเดิม] button ขึ้นก่อน interaction
         if not self.session.target_channel_id:
             await interaction.response.send_message("⚠️ กรุณาเลือกห้องสำหรับส่งผลประกาศก่อนครับ!", ephemeral=True)
             await asyncio.sleep(5)
@@ -444,7 +449,7 @@ class RandomStep2ConfigView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="🔙 ย้อนกลับ", style=discord.ButtonStyle.secondary, row=2)
-    async def back_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
+    async def back_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไขเดิม] button ขึ้นก่อน interaction
         if not interaction.guild: return
         view = RandomStep1ExemptView(self.session, interaction.guild)
         role_txt = f"<@&{self.session.selected_role_id}>" if getattr(self.session, 'selected_role_id', None) else "`สมาชิกทุกคน`"
@@ -459,7 +464,7 @@ class RandomStep2ConfigView(discord.ui.View):
         await interaction.response.edit_message(content=text, view=view)
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=2)
-    async def cancel_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับลำดับให้ button อยู่ก่อน
+    async def cancel_btn(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไขเดิม] button ขึ้นก่อน interaction
         await interaction.response.defer()
         try: await interaction.delete_original_response()
         except: pass
@@ -473,7 +478,8 @@ class RandomStep1ExemptView(discord.ui.View):
         role_id = getattr(self.session, 'selected_role_id', None)
         if role_id:
             for item in self.children:
-                if isinstance(item, discord.ui.RoleSelect):
+                # 🔴 [แก้ไข] เปลี่ยนจาก isinstance(item, discord.ui.RoleSelect) เพื่อป้องกัน TypeError
+                if getattr(item, "type", None) == discord.ComponentType.role_select:
                     r = discord.Object(id=role_id)
                     item.default_values = [r]
 
@@ -486,7 +492,7 @@ class RandomStep1ExemptView(discord.ui.View):
         max_values=1,
         row=0
     )
-    async def role_filter_select(self, select: discord.ui.Select, interaction: discord.Interaction):
+    async def role_filter_select(self, select: discord.ui.Select, interaction: discord.Interaction): # 👈 [แก้ไขเดิม] select ขึ้นก่อน interaction
         if select.values:
             selected_role = select.values[0]
             self.session.members = [m for m in selected_role.members if not m.bot]
@@ -741,6 +747,7 @@ class RealtimeRefreshView(discord.ui.View):
             pass
 
 # --- 3. ระบบแจ้งลาและ Log (บังคับ ค.ศ. / ลาไม่เกิน 15 วัน / แยกสี Log) ---
+# --- 3. ระบบแจ้งลาและ Log (บังคับ ค.ศ. / ลาไม่เกิน 15 วัน / แยกสี Log) ---
 class LeaveModal(discord.ui.Modal):
     def __init__(self, title, s_v, e_v, cat_val, t_id=None, is_f=False, old_re=""):
         super().__init__(title=title)
@@ -748,93 +755,123 @@ class LeaveModal(discord.ui.Modal):
         self.s_v, self.e_v = s_v, e_v
         
         if not is_f:
-            self.s_i = discord.ui.InputText(label='เริ่มลาวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 25/04/2026', value=s_v, required=True)
-            self.e_i = discord.ui.InputText(label='สิ้นสุดวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 30/04/2026', value=e_v, required=True)
+            # 🔴 [แก้ไข] เปลี่ยนจาก value=s_v มาเป็น value=s_v if s_v else None เพื่อป้องกันการส่ง value="" เข้า Discord API
+            self.s_i = discord.ui.InputText(
+                label='เริ่มลาวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', 
+                placeholder='ตัวอย่าง: 25/04/2026', 
+                value=s_v if s_v else None, 
+                required=True
+            )
+            self.e_i = discord.ui.InputText(
+                label='สิ้นสุดวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', 
+                placeholder='ตัวอย่าง: 30/04/2026', 
+                value=e_v if e_v else None, 
+                required=True
+            )
             self.add_item(self.s_i)
             self.add_item(self.e_i)
         
-        self.re = discord.ui.InputText(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.InputTextStyle.paragraph, value=old_re, required=True)
+        # 🔴 [แก้ไข] เปลี่ยน value=old_re มาเป็น value=old_re if old_re else None เช่นกัน
+        self.re = discord.ui.InputText(
+            label='เหตุผลการลา', 
+            placeholder='ระบุรายละเอียดเพิ่มเติม...', 
+            style=discord.InputTextStyle.paragraph, 
+            value=old_re if old_re else None, 
+            required=True
+        )
         self.add_item(self.re)
     
     async def on_submit(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
         
-        # --- ระบุ ID เซิร์ฟเวอร์ปัจจุบัน ---
-        gid = str(it.guild.id)
-        
-        s = self.s_v if self.is_f else self.s_i.value.strip()
-        e = self.e_v if self.is_f else self.e_i.value.strip()
-        
-        if not validate_date(s) or not validate_date(e):
-            err_msg = f"**⚠️ รูปแบบวันที่ไม่ถูกต้อง หรือไม่ใช่ปี ค.ศ.!**\n\nท่านกรอกมาว่า: เริ่ม `{s}`, สิ้นสุด `{e}`\n(ตัวอย่าง ค.ศ. ที่ถูกต้อง: 28/04/2026) ❌"
-            return await it.followup.send(content=err_msg, view=RetryView(self.title, "", "", self.cat_val, self.t_id, self.is_f, self.re.value), ephemeral=True)
-        
-        today = get_thai_time().date()
-        s_dt = datetime.strptime(s, "%d/%m/%Y").date()
-        e_dt = datetime.strptime(e, "%d/%m/%Y").date()
+        # 🔴 [แก้ไข] เพิ่ม try...except ครอบการทำงานทั้งหมด ป้องกันไม่ให้ Modal ค้างหรือขึ้นข้อผิดพลาด
+        try:
+            # --- ระบุ ID เซิร์ฟเวอร์ปัจจุบัน ---
+            gid = str(it.guild.id)
+            
+            s = self.s_v if self.is_f else self.s_i.value.strip()
+            e = self.e_v if self.is_f else self.e_i.value.strip()
+            
+            if not validate_date(s) or not validate_date(e):
+                err_msg = f"**⚠️ รูปแบบวันที่ไม่ถูกต้อง หรือไม่ใช่ปี ค.ศ.!**\n\nท่านกรอกมาว่า: เริ่ม `{s}`, สิ้นสุด `{e}`\n(ตัวอย่าง ค.ศ. ที่ถูกต้อง: 28/04/2026) ❌"
+                return await it.followup.send(content=err_msg, view=RetryView(self.title, "", "", self.cat_val, self.t_id, self.is_f, self.re.value), ephemeral=True)
+            
+            today = get_thai_time().date()
+            s_dt = datetime.strptime(s, "%d/%m/%Y").date()
+            e_dt = datetime.strptime(e, "%d/%m/%Y").date()
 
-        if s_dt < today:
-            return await it.followup.send(content="❌ **ไม่สามารถลาย้อนหลังได้**", view=RetryView(self.title, "", "", self.cat_val, self.t_id, self.is_f, self.re.value), ephemeral=True)
-        if e_dt < s_dt:
-            return await it.followup.send(content="❌ **วันที่สิ้นสุดต้องไม่มาก่อนวันที่เริ่มต้น!**", view=RetryView(self.title, s, "", self.cat_val, self.t_id, self.is_f, self.re.value), ephemeral=True)
+            if s_dt < today:
+                return await it.followup.send(content="❌ **ไม่สามารถลาย้อนหลังได้**", view=RetryView(self.title, "", "", self.cat_val, self.t_id, self.is_f, self.re.value), ephemeral=True)
+            if e_dt < s_dt:
+                return await it.followup.send(content="❌ **วันที่สิ้นสุดต้องไม่มาก่อนวันที่เริ่มต้น!**", view=RetryView(self.title, s, "", self.cat_val, self.t_id, self.is_f, self.re.value), ephemeral=True)
 
-        days = (e_dt - s_dt).days + 1
-        if days > 15:
-            return await it.followup.send(content=f"❌ **ไม่สามารถแจ้งลาเกิน 15 วันได้ (ท่านลา {days} วัน)**", view=RetryView(self.title, s, e, self.cat_val, self.t_id, self.is_f, self.re.value), ephemeral=True)
+            days = (e_dt - s_dt).days + 1
+            if days > 15:
+                return await it.followup.send(content=f"❌ **ไม่สามารถแจ้งลาเกิน 15 วันได้ (ท่านลา {days} วัน)**", view=RetryView(self.title, s, e, self.cat_val, self.t_id, self.is_f, self.re.value), ephemeral=True)
 
-        target_uid = self.t_id if self.t_id else str(it.user.id)
-        
-        # --- แก้ไข Logic: โหลดและบันทึกแยกไฟล์ตาม Guild ID ---
-        d = load_data(gid, "leaves", [])
-        d.append({
-            "user_id": str(it.user.id),
-            "target_id": target_uid,
-            "name": it.user.display_name,
-            "leave_category": self.cat_val,
-            "start_date": s,
-            "end_date": e,
-            "total_days": days,
-            "reason": self.re.value
-        })
-        save_data(gid, "leaves", d)
-        
-        # --- อัปเดตบอร์ดเฉพาะเซิร์ฟเวอร์ที่ทำรายการ ---
-        await update_summary_board(it.guild) 
-        
-        # --- แก้ไข Logic: โหลด Config แยกไฟล์ตาม Guild ID ---
-        cfg = load_data(gid, "config", {})
-        log_ch_id = cfg.get("log_ch")
-        
-        if log_ch_id:
-            log_ch = bot.get_channel(int(log_ch_id))
-            if log_ch:
-                target_m = it.guild.get_member(int(target_uid))
-                target_name = target_m.display_name if target_m else f"ID: {target_uid}"
-                executor_name = it.user.display_name
+            target_uid = self.t_id if self.t_id else str(it.user.id)
+            
+            # --- แก้ไข Logic: โหลดและบันทึกแยกไฟล์ตาม Guild ID ---
+            d = load_data(gid, "leaves", [])
+            d.append({
+                "user_id": str(it.user.id),
+                "target_id": target_uid,
+                "name": it.user.display_name,
+                "leave_category": self.cat_val,
+                "start_date": s,
+                "end_date": e,
+                "total_days": days,
+                "reason": self.re.value
+            })
+            save_data(gid, "leaves", d)
+            
+            # 🔴 [แก้ไข] ใส่ try ครอบการอัปเดตบอร์ดสรุป เพื่อไม่ให้กระทบการบันทึกใบลาของยูสเซอร์
+            try:
+                await update_summary_board(it.guild) 
+            except Exception as board_err:
+                print(f"⚠️ Warning: update_summary_board failed: {board_err}")
 
-                is_on_behalf = True if self.t_id and self.t_id != str(it.user.id) else False
-                log_title = "📌 บันทึกการแจ้งลาแทนเพื่อน" if is_on_behalf else "📌 บันทึกการแจ้งลาใหม่"
-                log_color = 0x3498db if is_on_behalf else 0x2ecc71
-                
-                log_em = discord.Embed(title=log_title, color=log_color)
-                on_behalf_txt = f"\n**👮 ผู้แจ้งลาแทน:** {executor_name}" if is_on_behalf else ""
-                dr = s if s == e else f"{s} - {e}"
-                
-                cat_display = format_categories(self.cat_val)
-                log_em.description = (
-                    f"**👤 สมาชิกที่ลา:** {target_name}{on_behalf_txt}\n\n"
-                    f"**📝 ประเภท:** {cat_display}\n"
-                    f"**📅 วันที่ลา:** {dr} `(รวม {days} วัน)`\n"
-                    f"**💬 เหตุผล:** {self.re.value}\n\n"
-                    f"{LONG_SEP}"
-                )
-                log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M')} น.")
-                await log_ch.send(embed=log_em)
-        
-        success_msg = await it.followup.send(content='✅ ระบบบันทึกใบลาของคุณเรียบร้อยแล้ว!', ephemeral=True)
-        await asyncio.sleep(3)
-        try: await success_msg.delete()
-        except: pass
+            # --- แก้ไข Logic: โหลด Config แยกไฟล์ตาม Guild ID ---
+            cfg = load_data(gid, "config", {})
+            log_ch_id = cfg.get("log_ch")
+            
+            if log_ch_id:
+                try:
+                    log_ch = bot.get_channel(int(log_ch_id))
+                    if log_ch:
+                        target_m = it.guild.get_member(int(target_uid))
+                        target_name = target_m.display_name if target_m else f"ID: {target_uid}"
+                        executor_name = it.user.display_name
+
+                        is_on_behalf = True if self.t_id and self.t_id != str(it.user.id) else False
+                        log_title = "📌 บันทึกการแจ้งลาแทนเพื่อน" if is_on_behalf else "📌 บันทึกการแจ้งลาใหม่"
+                        log_color = 0x3498db if is_on_behalf else 0x2ecc71
+                        
+                        log_em = discord.Embed(title=log_title, color=log_color)
+                        on_behalf_txt = f"\n**👮 ผู้แจ้งลาแทน:** {executor_name}" if is_on_behalf else ""
+                        dr = s if s == e else f"{s} - {e}"
+                        
+                        cat_display = format_categories(self.cat_val)
+                        log_em.description = (
+                            f"**👤 สมาชิกที่ลา:** {target_name}{on_behalf_txt}\n\n"
+                            f"**📝 ประเภท:** {cat_display}\n"
+                            f"**📅 วันที่ลา:** {dr} `(รวม {days} วัน)`\n"
+                            f"**💬 เหตุผล:** {self.re.value}\n\n"
+                            f"{LONG_SEP}"
+                        )
+                        log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M')} น.")
+                        await log_ch.send(embed=log_em)
+                except Exception as log_err:
+                    print(f"⚠️ Warning: log_ch send failed: {log_err}")
+            
+            success_msg = await it.followup.send(content='✅ ระบบบันทึกใบลาของคุณเรียบร้อยแล้ว!', ephemeral=True)
+            await asyncio.sleep(3)
+            try: await success_msg.delete()
+            except: pass
+
+        except Exception as e:
+            print(f"❌ Error in LeaveModal on_submit: {e}")
+            await it.followup.send(content=f"❌ **เกิดข้อผิดพลาดในการบันทึกข้อมูล:** `{e}`\nโปรดลองใหม่อีกครั้ง หรือแจ้งแอดมิน", ephemeral=True)
 
 class RetryView(discord.ui.View):
     def __init__(self, title, s, e, cat, t_id, is_f, re_val):
