@@ -97,6 +97,80 @@ def format_categories(cat_input):
         return f"`{cats[0]}`"
 
 # =====================================================================
+# --- ⚔️ ฟังก์ชันระบบอัปเดตเลเวลอาวุธ (WEAPON SYSTEM HELPERS) ---
+# =====================================================================
+
+# 🟢 รายชื่อ Role ID ที่อนุญาตให้จัดการระบบอาวุธได้
+WEAPON_ADMIN_ROLES = [1456220003195158568, 1469408762736676874, 1467435785945874443, 1515051953103568917]
+
+# 🟢 ฟังก์ชันตัดตัวเลข/สัญลักษณ์ออกจากชื่อ เพื่อให้การจัดระเบียบบอร์ดสวยงาม
+def clean_display_name(name: str) -> str:
+    if not name: return ""
+    cleaned = re.sub(r'^\d+[\.\s\-]*', '', name)
+    return re.split(r'[\s\─\│]+[^\w\s]', cleaned)[0].strip() or name
+
+# 🟢 ฟังก์ชันสร้างข้อความ Codeblock สำหรับบอร์ดอัปเดตอาวุธ
+def build_weapon_board_text(guild: discord.Guild) -> str:
+    gid = str(guild.id)
+    default_slots = {str(i).zfill(2): {"user_id": None, "name": "", "knife": "ยังไม่มีมีด", "machete": "ยังไม่มีมาเชเต้", "pool_cue": "ยังไม่มีไม้พูล", "gun": "ยังไม่มีปืน"} for i in range(1, 31)}
+    slots = load_data(gid, "weapon_slots", default_slots)
+
+    # คำนวณสรุปจำนวนปืน
+    gun_counts = {"+5": 0, "+4": 0, "+3": 0, "+2": 0, "+1": 0, "+0": 0, "ยังไม่มีปืน": 0}
+    for slot_info in slots.values():
+        if slot_info.get("user_id"):
+            gun_val = slot_info.get("gun", "ยังไม่มีปืน")
+            gun_counts[gun_val] = gun_counts.get(gun_val, 0) + 1
+
+    summary = (
+        "📊 **[ สรุปจำนวนปืนในแก๊ง ]**\n"
+        f"• ปืน +5: {gun_counts['+5']} คน  │  ปืน +4: {gun_counts['+4']} คน  │  ปืน +3: {gun_counts['+3']} คน\n"
+        f"• ปืน +2: {gun_counts['+2']} คน  │  ปืน +1: {gun_counts['+1']} คน  │  ปืน +0: {gun_counts['+0']} คน\n"
+        "-------------------------------------------------------------\n\n"
+    )
+
+    lines = []
+    for i in range(1, 31):
+        slot_key = str(i).zfill(2)
+        info = slots.get(slot_key, {})
+        if info.get("user_id"):
+            name = clean_display_name(info.get("name", ""))
+            lines.append(f"{slot_key}. {name:<18} │ มีด {info.get('knife'):<12} │ มาเช {info.get('machete'):<12} │ ไม้ {info.get('pool_cue'):<12} │ ปืน {info.get('gun')}")
+        else:
+            lines.append(f"{slot_key}. ")
+
+    now_str = get_thai_time().strftime('%d/%m/%Y เวลา %H:%M น.')
+    return f"```text\n⚔️ __บอร์ดอัปเดตเลเวลอาวุธแก๊ง Dark Monday__\n\n{summary}" + "\n".join(lines) + f"\n\nUpdate {now_str}\n```"
+
+# 🟢 ฟังก์ชันส่ง Log เมื่อมีแอดมินหรือสมาชิกทำรายการอาวุธ
+async def send_weapon_audit_log(guild: discord.Guild, log_text: str):
+    gid = str(guild.id)
+    cfg = load_data(gid, "config", {})
+    ch_id = cfg.get("weapon_log_ch")
+    if ch_id:
+        ch = guild.get_channel(int(ch_id))
+        if ch:
+            em = discord.Embed(title="📌 บันทึกระบบอาวุธ (Weapon Log)", description=f"{log_text}\n\n{LONG_SEP}", color=0xe67e22)
+            em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
+            try: await ch.send(embed=em)
+            except: pass
+
+# 🟢 ฟังก์ชันอัปเดตข้อความบอร์ดอาวุธหลัก Real-time
+async def update_weapon_board_msg(guild: discord.Guild):
+    gid = str(guild.id)
+    cfg = load_data(gid, "config", {})
+    ch_id = cfg.get("weapon_board_ch")
+    msg_id = cfg.get("weapon_board_msg")
+    if ch_id and msg_id:
+        ch = guild.get_channel(int(ch_id))
+        if ch:
+            try:
+                msg = await ch.fetch_message(int(msg_id))
+                await msg.edit(content=build_weapon_board_text(guild), view=WeaponBoardView())
+            except: pass
+
+
+# =====================================================================
 # --- 🎰 ระบบสุ่มรายชื่อสมาชิก / จัดทีม (RANDOM SYSTEM MODULE) ---
 # =====================================================================
 
@@ -1103,6 +1177,15 @@ class AdminPanelView(discord.ui.View):
             "กรุณาเลือกรูปแบบการสุ่มที่ต้องการใช้งานด้านล่างครับ:"
         )
         await interaction.response.send_message(content=text, view=view, ephemeral=True)
+
+    # 🟢 เพิ่มปุ่มระบบอาวุธใน Admin Panel
+    @discord.ui.button(label="⚔️ จัดการระบบอาวุธ", style=discord.ButtonStyle.success, custom_id="admin_panel_weapon_sys_btn")
+    async def weapon_system(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.send_message(
+            content="⚙️ **ระบบจัดการสล็อตและตั้งค่าบอร์ดอาวุธ**",
+            view=AdminWeaponManageView(),
+            ephemeral=True
+        )
 
 
 # =====================================================================
@@ -2370,6 +2453,168 @@ class LeaveCategoryView(discord.ui.View):
 async def admin(ctx):
     await ctx.send(embed=discord.Embed(title="🕹 Dark Monday Admin Panel"), view=AdminPanelView())
 
+# =====================================================================
+# --- ⚔️ UI & INTERFACE MODULE SYSTEM (WEAPON SYSTEM) ---
+# =====================================================================
+
+# 🟢 Modal สำหรับให้สมาชิกอัปเดตเหตุผล/หมายเหตุอาวุธ
+class MemberWeaponUpdateView(discord.ui.View):
+    def __init__(self, user_slot_key: str):
+        super().__init__(timeout=300)
+        self.user_slot_key = user_slot_key
+
+    @discord.ui.select(placeholder="🗡️ เลือกเลเวลมีด...", options=[
+        discord.SelectOption(label="ยังไม่มีมีด", value="ยังไม่มีมีด"),
+        discord.SelectOption(label="+0", value="+0"), discord.SelectOption(label="+1", value="+1"),
+        discord.SelectOption(label="+2", value="+2"), discord.SelectOption(label="+3", value="+3"),
+        discord.SelectOption(label="+4", value="+4"), discord.SelectOption(label="+5", value="+5")
+    ], row=0)
+    async def select_knife(self, select: discord.ui.Select, interaction: discord.Interaction):
+        self.knife_val = select.values[0]
+        await interaction.response.defer()
+
+    @discord.ui.select(placeholder="🔫 เลือกเลเวลปืน...", options=[
+        discord.SelectOption(label="ยังไม่มีปืน", value="ยังไม่มีปืน"),
+        discord.SelectOption(label="+0", value="+0"), discord.SelectOption(label="+1", value="+1"),
+        discord.SelectOption(label="+2", value="+2"), discord.SelectOption(label="+3", value="+3"),
+        discord.SelectOption(label="+4", value="+4"), discord.SelectOption(label="+5", value="+5")
+    ], row=1)
+    async def select_gun(self, select: discord.ui.Select, interaction: discord.Interaction):
+        self.gun_val = select.values[0]
+        await interaction.response.defer()
+
+    @discord.ui.button(label="✅ ยืนยันการอัปเดต", style=discord.ButtonStyle.success, row=2)
+    async def confirm_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
+        gid = str(interaction.guild.id)
+        slots = load_data(gid, "weapon_slots", {})
+
+        if self.user_slot_key not in slots:
+            return await interaction.response.send_message("❌ ไม่พบสล็อตของคุณในระบบ", ephemeral=True)
+
+        log_changes = []
+        if hasattr(self, 'knife_val'):
+            old_val = slots[self.user_slot_key].get("knife", "ยังไม่มีมีด")
+            slots[self.user_slot_key]["knife"] = self.knife_val
+            log_changes.append(f"มีด: `{old_val}` ➔ `{self.knife_val}`")
+        if hasattr(self, 'gun_val'):
+            old_val = slots[self.user_slot_key].get("gun", "ยังไม่มีปืน")
+            slots[self.user_slot_key]["gun"] = self.gun_val
+            log_changes.append(f"ปืน: `{old_val}` ➔ `{self.gun_val}`")
+
+        save_data(gid, "weapon_slots", slots)
+
+        await interaction.response.send_message("✅ อัปเดตข้อมูลอาวุธของคุณเรียบร้อยแล้ว!", ephemeral=True)
+        if log_changes:
+            await send_weapon_audit_log(interaction.guild, f"🔄 **{interaction.user.display_name}** (สล็อต {self.user_slot_key}) อัปเดตอาวุธ:\n• " + "\n• ".join(log_changes))
+            await update_weapon_board_msg(interaction.guild)
+
+# 🟢 Modal เพิ่มรายชื่อเข้าสล็อต (Admin)
+class AdminSlotAssignModal(discord.ui.Modal):
+    def __init__(self, target_member: discord.Member):
+        super().__init__(title="⚙️ เพิ่มรายชื่อสมาชิกเข้าสล็อต")
+        self.target_member = target_member
+        self.slot_num = discord.ui.InputText(label="🔢 หมายเลขสล็อต (1-30)", placeholder="เช่น 4 หรือ 12", max_length=2, required=True)
+        self.add_item(self.slot_num)
+
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            slot_int = int(self.slot_num.value)
+            if not (1 <= slot_int <= 30): raise ValueError()
+        except ValueError:
+            return await interaction.response.send_message("❌ กรุณากรอกหมายเลขสล็อตเป็นตัวเลข 1-30 เท่านั้น", ephemeral=True)
+
+        slot_key = str(slot_int).zfill(2)
+        gid = str(interaction.guild.id)
+        default_slots = {str(i).zfill(2): {"user_id": None, "name": "", "knife": "ยังไม่มีมีด", "machete": "ยังไม่มีมาเชเต้", "pool_cue": "ยังไม่มีไม้พูล", "gun": "ยังไม่มีปืน"} for i in range(1, 31)}
+        slots = load_data(gid, "weapon_slots", default_slots)
+
+        slots[slot_key]["user_id"] = self.target_member.id
+        slots[slot_key]["name"] = self.target_member.display_name
+        save_data(gid, "weapon_slots", slots)
+
+        await interaction.response.send_message(f"✅ เพิ่ม {self.target_member.display_name} เข้าสล็อต **{slot_key}** เรียบร้อย!", ephemeral=True)
+        await send_weapon_audit_log(interaction.guild, f"🛠️ **{interaction.user.display_name}** เพิ่ม **{self.target_member.display_name}** เข้าสล็อต **{slot_key}**")
+        await update_weapon_board_msg(interaction.guild)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.callback(interaction)
+
+# 🟢 View จัดการสล็อตและตั้งค่าบอร์ด (Admin Panel)
+class AdminWeaponManageView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.user_select(placeholder="👤 เลือกสมาชิกที่ต้องการใส่เข้าสล็อต...", row=0)
+    async def select_user(self, select: discord.ui.Select, interaction: discord.Interaction):
+        member = select.values[0]
+        await interaction.response.send_modal(AdminSlotAssignModal(member))
+
+    @discord.ui.button(label="📌 ตั้งค่าห้องบอร์ดอาวุธ", style=discord.ButtonStyle.primary, row=1)
+    async def setup_board_ch(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.send_message("📍 **เลือกห้องที่ต้องการใช้แสดงบอร์ดอาวุธ:**", view=WeaponChannelSetupView("board"), ephemeral=True)
+
+    @discord.ui.button(label="📌 ตั้งค่าห้อง Log อาวุธ", style=discord.ButtonStyle.primary, row=1)
+    async def setup_log_ch(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.send_message("📍 **เลือกห้องที่ต้องการใช้บันทึก Weapon Log:**", view=WeaponChannelSetupView("log"), ephemeral=True)
+
+# 🟢 View เลือกห้องตั้งค่าสำหรับระบบอาวุธ
+class WeaponChannelSetupView(discord.ui.View):
+    def __init__(self, mode: str):
+        super().__init__(timeout=180)
+        self.mode = mode
+
+    @discord.ui.channel_select(channel_types=[discord.ChannelType.text], placeholder="📢 เลือกห้องข้อความ...", row=0)
+    async def select_channel(self, select: discord.ui.Select, interaction: discord.Interaction):
+        ch = select.values[0]
+        gid = str(interaction.guild.id)
+        cfg = load_data(gid, "config", {})
+
+        if self.mode == "board":
+            cfg["weapon_board_ch"] = str(ch.id)
+            board_text = build_weapon_board_text(interaction.guild)
+            msg = await ch.send(content=board_text, view=WeaponBoardView())
+            cfg["weapon_board_msg"] = str(msg.id)
+            save_data(gid, "config", cfg)
+            await interaction.response.send_message(f"✅ บันทึกและสร้างบอร์ดอัปเดตอาวุธในห้อง {ch.mention} เรียบร้อย!", ephemeral=True)
+
+        elif self.mode == "log":
+            cfg["weapon_log_ch"] = str(ch.id)
+            save_data(gid, "config", cfg)
+            await interaction.response.send_message(f"✅ บันทึกห้อง Weapon Log เป็น {ch.mention} เรียบร้อย!", ephemeral=True)
+
+# 🟢 Persistent View บอร์ดอัปเดตอาวุธหลัก (ปุ่มถาวร)
+class WeaponBoardView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🔄 อัปเดตอาวุธของฉัน", style=discord.ButtonStyle.primary, custom_id="persistent_weapon_update_btn")
+    async def update_weapon_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
+        gid = str(interaction.guild.id)
+        slots = load_data(gid, "weapon_slots", {})
+
+        user_slot_key = next((k for k, v in slots.items() if v.get("user_id") == interaction.user.id), None)
+
+        if not user_slot_key:
+            return await interaction.response.send_message("❌ คุณยังไม่มีชื่ออยู่ในสล็อตแก๊ง กรุณาติดต่อแอดมินเพื่อลงทะเบียนเข้าสล็อตก่อนครับ", ephemeral=True)
+
+        await interaction.response.send_message(
+            content=f"🔄 **อัปเดตเลเวลอาวุธสำหรับสล็อต {user_slot_key} ({interaction.user.display_name})**",
+            view=MemberWeaponUpdateView(user_slot_key),
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="⚙️ จัดการสล็อต/รายชื่อ", style=discord.ButtonStyle.secondary, custom_id="persistent_weapon_admin_btn")
+    async def admin_manage_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
+        user_role_ids = [role.id for role in interaction.user.roles]
+        if not any(r_id in WEAPON_ADMIN_ROLES for r_id in user_role_ids):
+            return await interaction.response.send_message("❌ คุณไม่มีสิทธิ์ใช้งานเมนูนี้ครับ", ephemeral=True)
+
+        await interaction.response.send_message(
+            content="⚙️ **ระบบจัดการสล็อตและตั้งค่าบอร์ดอาวุธ (สำหรับแอดมิน)**",
+            view=AdminWeaponManageView(),
+            ephemeral=True
+        )
+
 
 # --- 9. ระบบ Backup (แก้ไขให้ส่งเฉพาะคนกด และแยกไฟล์ตาม Guild) ---
 @bot.command()
@@ -2427,12 +2672,13 @@ async def random_slash_cmd(ctx: discord.ApplicationContext):
 async def on_ready():
        
     # ลงทะเบียน View ทั้งหมดเพื่อให้ปุ่มทำงานได้ตลอดกาล (Persistent Views)
-    bot.add_view(LeaveMainView())         # หน้าหลักแจ้งลา
-    bot.add_view(RealtimeRefreshView())    # ปุ่มรีเฟรชบอร์ด
-    bot.add_view(AdminPanelView())         # หน้าหลัก !admin
-    bot.add_view(CategorySelectionView())  # หน้าเลือกหมวดหมู่ (แจ้งลา/แจ้งปรับเงิน)
-    bot.add_view(AdminLeaveManagementView()) # ระบบลา/จัดการใบลา
-    bot.add_view(ConfirmClearView())       # หน้ากดยืนยัน Cleanup 120 วัน
+    bot.add_view(LeaveMainView())              # หน้าหลักแจ้งลา
+    bot.add_view(RealtimeRefreshView())        # ปุ่มรีเฟรชบอร์ด
+    bot.add_view(AdminPanelView())             # หน้าหลัก !admin
+    bot.add_view(CategorySelectionView())      # หน้าเลือกหมวดหมู่ (แจ้งลา/แจ้งปรับเงิน)
+    bot.add_view(AdminLeaveManagementView())   # ระบบลา/จัดการใบลา
+    bot.add_view(ConfirmClearView())           # หน้ากดยืนยัน Cleanup 120 วัน
+    bot.add_view(WeaponBoardView())            # ⚔️ บอร์ดอัปเดตอาวุธถาวร
     
     print(f'✅ {bot.user.name} ออนไลน์เรียบร้อย | ระบบปี 2026 พร้อมใช้งาน')
     if not daily_report_task.is_running(): daily_report_task.start()
