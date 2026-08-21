@@ -1042,9 +1042,13 @@ class ConfirmClearView(discord.ui.View):
         except:
             pass
 
-class AdminSubChannelSelect(discord.ui.ChannelSelect):
+class AdminSubChannelSelect(discord.ui.Select):
     def __init__(self):
-        super().__init__(placeholder="🔍 ค้นหาห้องที่ต้องการ...", channel_types=[discord.ChannelType.text])
+        super().__init__(
+            select_type=discord.ComponentType.channel_select,
+            placeholder="🔍 ค้นหาห้องที่ต้องการ...",
+            channel_types=[discord.ChannelType.text]
+        )
     async def callback(self, it):
         self.view.temp_ch = self.values[0].id
         await it.response.edit_message(content=f"📍 เลือกห้อง: {self.values[0].mention}\n👉 **กรุณากดยืนยันด้านล่างเพื่อบันทึกครับ**")
