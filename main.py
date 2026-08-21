@@ -300,7 +300,7 @@ class RerollConfirmModal(discord.ui.Modal, title="🔄 ยืนยันกา�
 
     notice = discord.ui.TextInput(
         label="⚠️ คำเตือนการบันทึกประวัติ",
-        style=discord.TextStyle.paragraph,
+        style=discord.InputTextStyle.paragraph,
         default="การกดสุ่มใหม่จะทำการบันทึกชื่อ Display Name ของคุณ รอบการสุ่ม และเวลาปัจจุบันลงในประกาศผลเพื่อความโปร่งใส",
         required=False
     )
@@ -858,7 +858,7 @@ class LeaveModal(discord.ui.Modal):
             self.add_item(self.s_i)
             self.add_item(self.e_i)
         
-        self.re = discord.ui.TextInput(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.TextStyle.paragraph, default=old_re, required=True)
+        self.re = discord.ui.TextInput(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.InputTextStyle.paragraph, default=old_re, required=True)
         self.add_item(self.re)
     
     async def on_submit(self, it: discord.Interaction):
@@ -1535,7 +1535,7 @@ class MonthlyUserSelect(discord.ui.Select):
                 # 🟢 แปลงประเภทการลาเป็นย่อสีเทาผ่าน format_categories
                 cat_disp_item = format_categories(leaf.get('leave_category', 'ทั่วไป'))
                 em.description += (
-                    f"**{idx}\. [{cat_disp_item}]**\n"
+                    f"**{idx}\\. [{cat_disp_item}]**\n"
                     f"┗ 📅 วันที่ลา: {item['dr']} `{day_txt}`\n"
                     f"┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
                 )
@@ -1887,7 +1887,7 @@ class AdminEditDetailsModal(discord.ui.Modal):
         
         self.s_i = discord.ui.TextInput(label="วันเริ่มลา (วว/ดด/ปปปป) *ค.ศ.*", default=od['start_date'], required=True)
         self.e_i = discord.ui.TextInput(label="วันสิ้นสุด (วว/ดด/ปปปป) *ค.ศ.*", default=od['end_date'], required=True)
-        self.re = discord.ui.TextInput(label="เหตุผลการลา", style=discord.TextStyle.paragraph, default=od['reason'], required=True)
+        self.re = discord.ui.TextInput(label="เหตุผลการลา", style=discord.InputTextStyle.paragraph, default=od['reason'], required=True)
         self.admin_re = discord.ui.TextInput(label="หมายเหตุจากแอดมิน (ทำไมถึงแก้?)", placeholder="ระบุเหตุผลเพื่อบันทึกใน Log...", required=True)
         
         self.add_item(self.s_i)
@@ -2118,7 +2118,7 @@ class CancelReasonModal(discord.ui.Modal):
         super().__init__(title="ระบุเหตุผลการยกเลิก")
         self.target_idx, self.od = target_idx, od
         self.is_admin_request = is_admin_request 
-        self.reason = discord.ui.TextInput(label='เหตุผลที่ยกเลิก', placeholder='ระบุเหตุผลที่นี่...', style=discord.TextStyle.paragraph, required=True)
+        self.reason = discord.ui.TextInput(label='เหตุผลที่ยกเลิก', placeholder='ระบุเหตุผลที่นี่...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
     
     async def on_submit(self, it: discord.Interaction):
@@ -2283,7 +2283,7 @@ class EditReasonModal(discord.ui.Modal):
     def __init__(self, idx, od, new_end):
         super().__init__(title="ระบุเหตุผลการแก้ไขวันลา")
         self.idx, self.od, self.new_end = idx, od, new_end
-        self.reason = discord.ui.TextInput(label='เหตุผลที่ขอแก้ไข', placeholder='ระบุรายละเอียด...', style=discord.TextStyle.paragraph, required=True)
+        self.reason = discord.ui.TextInput(label='เหตุผลที่ขอแก้ไข', placeholder='ระบุรายละเอียด...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
     async def on_submit(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
