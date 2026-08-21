@@ -1,7 +1,8 @@
 import discord
 from discord.ext import commands, tasks
 import json, os, re, asyncio, random
-from datetime import datetime, timedelta
+# เพิ่ม timezone ในการนำเข้าข้อมูล datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 
 # --- 1. การจัดการข้อมูลแบบแยกไฟล์ (Multi-guild) ---
@@ -35,8 +36,9 @@ intents.message_content = True
 intents.members = True 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# 🟢 [แก้ไขจุดที่ 1] เปลี่ยนการดึงเวลาให้อิงมาตรฐาน UTC+7 ป้องกันเวลา Server เพี้ยน
 def get_thai_time():
-    return datetime.now() + timedelta(hours=7)
+    return datetime.now(timezone.utc) + timedelta(hours=7)
 
 def validate_date(d_str):
     if not re.match(r"^\d{2}/\d{2}/\d{4}$", d_str):
@@ -191,7 +193,7 @@ class RerollConfirmModal(discord.ui.Modal, title="🔄 ยืนยันกา�
 
     notice = discord.ui.TextInput(
         label="⚠️ คำเตือนการบันทึกประวัติ",
-        style=discord.TextStyle.paragraph,
+        style=discord.InputTextStyle.paragraph,
         default="การกดสุ่มใหม่จะทำการบันทึกชื่อ Display Name ของคุณ รอบการสุ่ม และเวลาปัจจุบันลงในประกาศผลเพื่อความโปร่งใส",
         required=False
     )
@@ -749,7 +751,7 @@ class LeaveModal(discord.ui.Modal):
             self.add_item(self.s_i)
             self.add_item(self.e_i)
         
-        self.re = discord.ui.TextInput(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.TextStyle.paragraph, default=old_re, required=True)
+        self.re = discord.ui.TextInput(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.InputTextStyle.paragraph, default=old_re, required=True)
         self.add_item(self.re)
     
     async def on_submit(self, it: discord.Interaction):
@@ -1554,7 +1556,7 @@ class AdminEditDetailsModal(discord.ui.Modal):
         
         self.s_i = discord.ui.TextInput(label="วันเริ่มลา (วว/ดด/ปปปป) *ค.ศ.*", default=od['start_date'], required=True)
         self.e_i = discord.ui.TextInput(label="วันสิ้นสุด (วว/ดด/ปปปป) *ค.ศ.*", default=od['end_date'], required=True)
-        self.re = discord.ui.TextInput(label="เหตุผลการลา", style=discord.TextStyle.paragraph, default=od['reason'], required=True)
+        self.re = discord.ui.TextInput(label="เหตุผลการลา", style=discord.InputTextStyle.paragraph, default=od['reason'], required=True)
         self.admin_re = discord.ui.TextInput(label="หมายเหตุจากแอดมิน (ทำไมถึงแก้?)", placeholder="ระบุเหตุผลเพื่อบันทึกใน Log...", required=True)
         
         self.add_item(self.s_i)
@@ -1785,7 +1787,7 @@ class CancelReasonModal(discord.ui.Modal):
         super().__init__(title="ระบุเหตุผลการยกเลิก")
         self.target_idx, self.od = target_idx, od
         self.is_admin_request = is_admin_request 
-        self.reason = discord.ui.TextInput(label='เหตุผลที่ยกเลิก', placeholder='ระบุเหตุผลที่นี่...', style=discord.TextStyle.paragraph, required=True)
+        self.reason = discord.ui.TextInput(label='เหตุผลที่ยกเลิก', placeholder='ระบุเหตุผลที่นี่...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
     
     async def on_submit(self, it: discord.Interaction):
@@ -1950,7 +1952,7 @@ class EditReasonModal(discord.ui.Modal):
     def __init__(self, idx, od, new_end):
         super().__init__(title="ระบุเหตุผลการแก้ไขวันลา")
         self.idx, self.od, self.new_end = idx, od, new_end
-        self.reason = discord.ui.TextInput(label='เหตุผลที่ขอแก้ไข', placeholder='ระบุรายละเอียด...', style=discord.TextStyle.paragraph, required=True)
+        self.reason = discord.ui.TextInput(label='เหตุผลที่ขอแก้ไข', placeholder='ระบุรายละเอียด...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
     async def on_submit(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
@@ -2380,4 +2382,8 @@ async def on_ready():
     if not daily_report_task.is_running(): daily_report_task.start()
     # if not weekly_report_task.is_running(): weekly_report_task.start()
 
-bot.run(TOKEN)
+# ตรวจสอบ TOKEN และห่อรันบอทด้วย Main Guard เพื่อความปลอดภัย
+if __name__ == "__main__":
+    if not TOKEN:
+        raise ValueError("❌ ไม่พบ DISCORD_TOKEN ใน Environment Variables กรุณาตั้งค่าก่อนรันบอท")
+    bot.run(TOKEN)
