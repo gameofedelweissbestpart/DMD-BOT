@@ -935,10 +935,14 @@ class ConfirmClearView(discord.ui.View):
         except:
             pass
 
-class AdminSubChannelSelect(discord.ui.ChannelSelect):
+class AdminSubChannelSelect(discord.ui.Select):
     def __init__(self):
-        super().__init__(placeholder="🔍 ค้นหาห้องที่ต้องการ...", channel_types=[discord.ChannelType.text])
-    async def callback(self, it):
+        super().__init__(
+            select_type=discord.ComponentType.channel_select,
+            placeholder="🔍 ค้นหาห้องที่ต้องการ...",
+            channel_types=[discord.ChannelType.text]
+        )
+    async def callback(self, it: discord.Interaction):
         self.view.temp_ch = self.values[0].id
         await it.response.edit_message(content=f"📍 เลือกห้อง: {self.values[0].mention}\n👉 **กรุณากดยืนยันด้านล่างเพื่อบันทึกครับ**")
 
@@ -1204,7 +1208,7 @@ class MonthlyUserSelect(discord.ui.Select):
                 # 🟢 แปลงประเภทการลาเป็นย่อสีเทาผ่าน format_categories
                 cat_disp_item = format_categories(leaf.get('leave_category', 'ทั่วไป'))
                 em.description += (
-                    f"**{idx}\. [{cat_disp_item}]**\n"
+                    rf"**{idx}\. [{cat_disp_item}]**\n"
                     f"┗ 📅 วันที่ลา: {item['dr']} `{day_txt}`\n"
                     f"┗ 💬 เหตุผล: {leaf.get('reason', '-')}{on_behalf}\n\n"
                 )
@@ -2186,12 +2190,16 @@ class LeaveMainView(discord.ui.View):
         await it.response.send_message("✏️ เลือกใบลาของคุณที่จะแก้ไข:", view=SubMenuView(it, EditLeaveSelect(opts[:25], it)), ephemeral=True)   
 
 
-class FriendSelect(discord.ui.UserSelect):
+class FriendSelect(discord.ui.Select):
     def __init__(self):
-        super().__init__(placeholder="👤 เลือกเพื่อน...", min_values=1, max_values=1)
-    async def callback(self, it):
+        super().__init__(
+            select_type=discord.ComponentType.user_select,
+            placeholder="👤 เลือกเพื่อน...",
+            min_values=1,
+            max_values=1
+        )
+    async def callback(self, it: discord.Interaction):
         t_id = str(self.values[0].id)
-        # 🟢 แสดงแท็กชื่อเพื่อน และส่งต่อไปยัง DateSelectView
         await it.response.edit_message(
             content=f"🎯 **ลาแทนคุณ:** {self.values[0].mention}\n👉 **กรุณาเลือกวันที่ลาด้านล่าง:**", 
             view=DateSelectView(t_id=t_id)
