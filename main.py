@@ -1081,7 +1081,7 @@ class MonthlyDetailView(discord.ui.View):
     async def reselect_month(self, button: discord.ui.Button, interaction: discord.Interaction):
         await send_month_selection(interaction)
 
-    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger)
     async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.defer()
         try: await interaction.delete_original_response()
@@ -1098,7 +1098,7 @@ class MonthlyOverviewView(discord.ui.View):
     async def reselect_month(self, button: discord.ui.Button, interaction: discord.Interaction):
         await send_month_selection(interaction)
 
-    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=4)
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=4)
     async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.defer()
         try:
@@ -1212,7 +1212,7 @@ class MonthlyOverviewView(discord.ui.View):
     async def reselect_month(self, it: discord.Interaction, b: discord.ui.Button):
         await send_month_selection(it)
 
-    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=4)
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=4)
     async def close_menu(self, it: discord.Interaction, b: discord.ui.Button):
         await it.response.defer()
         try:
@@ -1343,7 +1343,7 @@ class MonthSelectView(discord.ui.View):
         super().__init__(timeout=600)  # ขยายเวลาเป็น 10 นาที (600 วินาที)
         self.add_item(MonthSelect(opts))
 
-    @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
     async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.defer()
         try: await interaction.delete_original_response()
