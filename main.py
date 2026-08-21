@@ -992,7 +992,7 @@ class CategorySelectionView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="📝 ระบบแจ้งลา", style=discord.ButtonStyle.primary, custom_id="setup_leave_system")
-    async def leave_system_setup(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def leave_system_setup(self, interaction: discord.Interaction):
         opts = [
             discord.SelectOption(label="📝 ห้องปุ่มแจ้งลา", value="leave_ch"),
             discord.SelectOption(label="📋 ตาราง Real-time", value="realtime_ch"),
@@ -1003,7 +1003,7 @@ class CategorySelectionView(discord.ui.View):
         await interaction.response.edit_message(content="🛠 **ระบบแจ้งลา:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)))
 
     @discord.ui.button(label="💰 ระบบแจ้งปรับเงิน", style=discord.ButtonStyle.primary, custom_id="setup_fine_system")
-    async def fine_system_setup(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def fine_system_setup(self, interaction: discord.Interaction):
         opts = [
             discord.SelectOption(label="📋 แจ้งค่าปรับ Real-time", value="fine_realtime_ch"),
             discord.SelectOption(label="📌 Log การปรับเงิน", value="fine_log_ch"),
@@ -1012,7 +1012,7 @@ class CategorySelectionView(discord.ui.View):
         await interaction.response.edit_message(content="🛠 **ระบบแจ้งปรับเงิน:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)))
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, custom_id="admin_close_setup_category")
-    async def close_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def close_menu(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer()
             await interaction.delete_original_response()
@@ -1024,11 +1024,11 @@ class AdminPanelView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="📍 ตั้งค่าห้องต่างๆ", style=discord.ButtonStyle.primary, custom_id="admin_panel_set_l_btn")
-    async def set_l(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def set_l(self, interaction: discord.Interaction):
         await interaction.response.send_message("📂 **เลือกหมวดหมู่ที่ต้องการจัดการ:**", view=CategorySelectionView(), ephemeral=True)
 
     @discord.ui.button(label="📋 ระบบลา", style=discord.ButtonStyle.primary, custom_id="admin_panel_leave_sys_btn")
-    async def leave_system(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def leave_system(self, interaction: discord.Interaction):
         await interaction.response.send_message(
             content="📑 **เมนูจัดการระบบลา:** เลือกการดำเนินการที่ต้องการ", 
             view=AdminLeaveManagementView(), 
@@ -1036,7 +1036,7 @@ class AdminPanelView(discord.ui.View):
         )
 
     @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.primary, custom_id="admin_panel_random_sys_btn")
-    async def random_system(self, button: discord.ui.Button, interaction: discord.Interaction):
+    async def random_system(self, interaction: discord.Interaction):
         members = [m for m in interaction.guild.members if not m.bot]
         if not members:
             await interaction.response.send_message("❌ ไม่พบสมาชิกในเซิร์ฟเวอร์", ephemeral=True)
@@ -1351,7 +1351,7 @@ class AdminLeaveManagementView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="⚙️ จัดการใบลาทั้งหมด", style=discord.ButtonStyle.primary, custom_id="admin_manage_all_leaves_v2")
-    async def manage_all(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def manage_all(self, interaction: discord.Interaction):
         gid = str(interaction.guild.id)
         d = load_data(gid, "leaves", [])
         now_date = get_thai_time().date()
@@ -1400,17 +1400,17 @@ class AdminLeaveManagementView(discord.ui.View):
         )
 
     @discord.ui.button(label="📊 สรุปประวัติการลา (รายเดือน)", style=discord.ButtonStyle.primary, custom_id="admin_monthly_history_btn")
-    async def history_monthly(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def history_monthly(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await send_month_selection(interaction)
 
     @discord.ui.button(label="🗑️ ล้างข้อมูลใบลา (120 วัน)", style=discord.ButtonStyle.primary, custom_id="admin_cleanup_trigger_v2")
-    async def cleanup(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def cleanup(self, interaction: discord.Interaction):
         txt = "⚠️ **คุณยืนยันที่จะ Cleanup ข้อมูลใบลาที่เก่ากว่า 4 เดือน (120 วัน) ใช่หรือไม่?**\nระบบจะส่งไฟล์ Backup ให้คุณก่อนดำเนินการ"
         await interaction.response.send_message(content=txt, view=ConfirmClearView(), ephemeral=True)
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, custom_id="admin_close_leave_system_v2")
-    async def close_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def close_menu(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer()
             await interaction.delete_original_response()
