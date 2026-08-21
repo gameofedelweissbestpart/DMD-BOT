@@ -1095,11 +1095,13 @@ class MonthlyOverviewView(discord.ui.View):
         self.month = month
 
     @discord.ui.button(label="📅 เลือกเดือนใหม่", style=discord.ButtonStyle.primary, row=4)
-    async def reselect_month(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับให้ button อยู่ก่อน interaction
+    async def reselect_month(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # ส่ง interaction (ตัวแปรที่ 2) ไปใช้งาน ไม่ใช่ button
         await send_month_selection(interaction)
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=4)
-    async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับให้ button อยู่ก่อน interaction
+    async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # ใช้ interaction (ตัวแปรที่ 2) สั่ง defer และปิดเมนู
         await interaction.response.defer()
         try:
             await interaction.delete_original_response()
