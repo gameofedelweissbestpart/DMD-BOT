@@ -1328,23 +1328,25 @@ async def generate_and_send_monthly_overview(it: discord.Interaction, guild, yea
     else:
         await it.edit_original_response(content=None, embed=em, view=view)
 
+# --- คลาส MonthSelect (กำหนด row=0 ให้อยู่แถวบนสุด) ---
 class MonthSelect(discord.ui.Select):
     def __init__(self, opts):
-        super().__init__(placeholder="📅 เลือกเดือนที่ต้องการดูสรุป...", options=opts)
+        super().__init__(placeholder="📅 เลือกเดือนที่ต้องการดูสรุป...", options=opts, row=0)
     async def callback(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
         year, month = map(int, self.values[0].split('-'))
         await generate_and_send_monthly_overview(it, it.guild, year, month)
 
+# --- คลาส MonthSelectView (สลับพารามิเตอร์ปุ่มเป็น button, interaction และกำหนด row=1 ให้อยู่ด้านล่าง) ---
 class MonthSelectView(discord.ui.View):
     def __init__(self, opts):
         super().__init__(timeout=600)  # ขยายเวลาเป็น 10 นาที (600 วินาที)
         self.add_item(MonthSelect(opts))
 
     @discord.ui.button(label="❌ ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
-    async def close_menu(self, it: discord.Interaction, b: discord.ui.Button):
-        await it.response.defer()
-        try: await it.delete_original_response()
+    async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.defer()
+        try: await interaction.delete_original_response()
         except: pass
 
 async def send_month_selection(it: discord.Interaction):
