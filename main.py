@@ -842,15 +842,14 @@ class LeaveModal(discord.ui.Modal):
 
 class RetryView(discord.ui.View):
     def __init__(self, title, s, e, cat, t_id, is_f, re_val):
-        super().__init__(timeout=120) # ค้างไว้ให้กดแก้
+        super().__init__(timeout=120)
         self.title, self.s, self.e, self.cat, self.t_id, self.is_f, self.re_val = title, s, e, cat, t_id, is_f, re_val
+
     @discord.ui.button(label="📝 แก้ไขข้อมูลอีกครั้ง", style=discord.ButtonStyle.primary)
-    async def retry(self, it, b):
-        await it.response.send_modal(LeaveModal(self.title, self.s, self.e, self.cat, self.t_id, self.is_f, self.re_val))
-        try:
-            await it.delete_original_response()
-        except:
-            pass
+    async def retry(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(LeaveModal(self.title, self.s, self.e, self.cat, self.t_id, self.is_f, self.re_val))
+        try: await interaction.delete_original_response()
+        except: pass
 
 # --- 4. ส่วน Admin (ปรับหัวข้อหน้าหลักตามสั่ง + หมายเหตุใหม่) ---
 # --- 1. วางทับคลาส ConfirmClearView ---
@@ -858,33 +857,21 @@ class ConfirmClearView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None) 
 
-    @discord.ui.button(label="⚠️ ยืนยันล้างข้อมูลเก่า (ย้อนหลัง 4 เดือน / 120 วัน)", 
-                       style=discord.ButtonStyle.success, 
-                       custom_id="admin_confirm_cleanup_v1") 
-    async def confirm(self, it: discord.Interaction, b: discord.ui.Button):
-        # [1] จองคิวการตอบกลับแบบข้อความลับ (Ephemeral)
-        await it.response.defer(ephemeral=True)
-        
-        # --- เริ่มการแก้ไข Logic แยกไฟล์ตาม Guild ---
-        gid = str(it.guild.id)
+    @discord.ui.button(label="⚠️ ยืนยันล้างข้อมูลเก่า (ย้อนหลัง 4 เดือน / 120 วัน)", style=discord.ButtonStyle.success, custom_id="admin_confirm_cleanup_v1") 
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        gid = str(interaction.guild.id)
         path_leaves = get_path(gid, "leaves")
         path_config = get_path(gid, "config")
         
-        # [2] สำรองข้อมูลส่งให้เฉพาะ "ผู้ที่กดปุ่ม" เท่านั้น (แยกตาม Guild)
         try:
             f_send = []
             if os.path.exists(path_leaves): f_send.append(discord.File(path_leaves))
             if os.path.exists(path_config): f_send.append(discord.File(path_config))
-            
-            # ส่ง DM ตรงหา it.user (ผู้กดปุ่ม)
-            await it.user.send(
-                f"📦 **Backup ก่อน Cleanup:** ท่านได้ดำเนินการล้างข้อมูลเก่า\nนี่คือไฟล์สำรองข้อมูลส่วนตัวของท่านครับ:", 
-                files=f_send
-            )
+            await interaction.user.send("📦 **Backup ก่อน Cleanup:** ท่านได้ดำเนินการล้างข้อมูลเก่า\nนี่คือไฟล์สำรองข้อมูลส่วนตัวของท่านครับ:", files=f_send)
         except discord.Forbidden:
-            return await it.followup.send("❌ ไม่สามารถส่งไฟล์สำรองได้ โปรดเปิด DM แล้วลองใหม่อีกครั้ง", ephemeral=True)
+            return await interaction.followup.send("❌ ไม่สามารถส่งไฟล์สำรองได้ โปรดเปิด DM แล้วลองใหม่อีกครั้ง", ephemeral=True)
 
-        # [3] กรองข้อมูลย้อนหลัง 120 วัน (4 เดือน) (แยกตาม Guild)
         d = load_data(gid, "leaves", [])
         now = get_thai_time().date()
         threshold_date = now - timedelta(days=120) 
@@ -894,17 +881,11 @@ class ConfirmClearView(discord.ui.View):
         for entry in d:
             try:
                 end_dt = datetime.strptime(entry['end_date'], "%d/%m/%Y").date()
-                if end_dt >= threshold_date:
-                    filtered_data.append(entry)
-                else:
-                    removed_count += 1
-            except:
-                removed_count += 1
+                if end_dt >= threshold_date: filtered_data.append(entry)
+                else: removed_count += 1
+            except: removed_count += 1
 
-        # [4] บันทึกข้อมูลและแจ้งผล (แยกตาม Guild)
         save_data(gid, "leaves", filtered_data)
-        
-        # ส่ง Log สีส้มเข้าห้อง Log ตามปกติ (ตัดคำสั่ง update_summary_board ออกตามตกลง)
         cfg = load_data(gid, "config", {})
         log_ch_id = cfg.get("log_ch")
         if log_ch_id:
@@ -912,7 +893,7 @@ class ConfirmClearView(discord.ui.View):
             if log_ch:
                 l_em = discord.Embed(title="⚠️ ประกาศ: Cleanup ข้อมูลใบลาประจำเดือน", color=0xf39c12)
                 l_em.description = (
-                    f"**👮 ผู้ดำเนินการ:** {it.user.display_name}\n"
+                    f"**👮 ผู้ดำเนินการ:** {interaction.user.display_name}\n"
                     f"**🧹 ลบข้อมูลที่เก่ากว่า:** {threshold_date.strftime('%d/%m/%Y')} *(120 วัน)*\n"
                     f"**📊 จำนวนที่ลบออก:** `{removed_count}` รายการ\n"
                     f"**📦 ข้อมูลคงเหลือ:** `{len(filtered_data)}` รายการ\n\n"
@@ -921,25 +902,20 @@ class ConfirmClearView(discord.ui.View):
                 l_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
                 await log_ch.send(embed=l_em)
             
-        # [5] อัปเดตข้อความลับแจ้งผู้ใช้
-        await it.edit_original_response(
+        await interaction.edit_original_response(
             content=f"✅ Cleanup สำเร็จ! ลบข้อมูลเก่าที่เกิน 120 วัน ออกไป `{removed_count}` รายการเรียบร้อยแล้ว (ไฟล์ส่งเข้า DM ท่านแล้ว)", 
             view=None
         )
-        
         await asyncio.sleep(3)
-        try:
-            await it.delete_original_response()
-        except:
-            pass
+        try: await interaction.delete_original_response()
+        except: pass
 
     @discord.ui.button(label="ยกเลิก", style=discord.ButtonStyle.danger, custom_id="admin_close_cleanup_panel")
-    async def close_menu(self, it: discord.Interaction, button: discord.ui.Button):
+    async def close_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
-            await it.response.defer()
-            await it.delete_original_response()
-        except:
-            pass
+            await interaction.response.defer()
+            await interaction.delete_original_response()
+        except: pass
 
 class AdminSubChannelSelect(discord.ui.Select):
     def __init__(self):
@@ -954,33 +930,23 @@ class AdminSubChannelSelect(discord.ui.Select):
 
 class AdminSubMenuView(discord.ui.View):
     def __init__(self, cat):
-        super().__init__(timeout=None) # บังคับให้ปุ่มไม่หมดอายุ
+        super().__init__(timeout=None)
         self.cat = cat
         self.temp_ch = None
         self.add_item(AdminSubChannelSelect())
 
-    @discord.ui.button(label="ยืนยันตั้งค่า", 
-                       style=discord.ButtonStyle.success, 
-                       custom_id="admin_save_room_config") # เพิ่ม ID ตรงนี้
-    async def confirm(self, it: discord.Interaction, b):
-        # --- คงคำพูดเดิมของคุณไว้ทั้งหมด ---
+    @discord.ui.button(label="ยืนยันตั้งค่า", style=discord.ButtonStyle.success, custom_id="admin_save_room_config")
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.temp_ch:
-            return await it.response.send_message("❌ กรุณาเลือกห้องก่อน!", ephemeral=True)
+            return await interaction.response.send_message("❌ กรุณาเลือกห้องก่อน!", ephemeral=True)
         
-        await it.response.defer(ephemeral=True)
-        
-        # --- เริ่มการแก้ไข Logic แยกไฟล์ตาม Guild ---
-        gid = str(it.guild.id) 
-        
-        # โหลด Config เฉพาะของ Guild นี้
+        await interaction.response.defer(ephemeral=True)
+        gid = str(interaction.guild.id) 
         cfg = load_data(gid, "config", {}) 
         cfg[self.cat] = str(self.temp_ch)
-        
-        # บันทึก Config ลงไฟล์แยกของ Guild นี้
         save_data(gid, "config", cfg) 
         
         if self.cat == "leave_ch":
-            # ปรับหัวข้อ: ใหญ่พิเศษขีดเส้นใต้ + หมายเหตุใหม่ตามสั่ง (คงเดิม 100%)[cite: 1]
             em = discord.Embed(
                 title=None, 
                 description=(
@@ -1001,16 +967,12 @@ class AdminSubMenuView(discord.ui.View):
             )
             await bot.get_channel(int(self.temp_ch)).send(embed=em, view=LeaveMainView())
         elif self.cat == "realtime_ch":
-            # ส่ง Object Guild เข้าไปเพื่อให้อัปเดตบอร์ดได้ถูกเซิร์ฟเวอร์
-            await update_summary_board(it.guild)
+            await update_summary_board(interaction.guild)
         
-        # คงคำพูดเดิม[cite: 1]
-        await it.edit_original_response(content=f"✅ ตั้งค่าห้องสำหรับ **{self.cat}** สำเร็จ!", view=None)
+        await interaction.edit_original_response(content=f"✅ ตั้งค่าห้องสำหรับ **{self.cat}** สำเร็จ!", view=None)
         await asyncio.sleep(3)
-        try:
-            await it.delete_original_response()
-        except:
-            pass
+        try: await interaction.delete_original_response()
+        except: pass
 
 class AdminCatSelect(discord.ui.Select):
     def __init__(self, opts):
@@ -1028,12 +990,10 @@ class SubMenuView(discord.ui.View):
 # --- ส่วนที่ 1: หน้าเลือกเลือกระบบ (ลา หรือ ปรับเงิน) ---
 class CategorySelectionView(discord.ui.View):
     def __init__(self):
-        # 1. ตั้งค่า timeout เป็น None เพื่อให้ View นี้ไม่หมดอายุ
         super().__init__(timeout=None)
 
-    # 2. ตรวจสอบว่าปุ่มมี custom_id ที่แน่นอน
     @discord.ui.button(label="📝 ระบบแจ้งลา", style=discord.ButtonStyle.primary, custom_id="setup_leave_system")
-    async def leave_system_setup(self, it: discord.Interaction, button: discord.ui.Button):
+    async def leave_system_setup(self, interaction: discord.Interaction, button: discord.ui.Button):
         opts = [
             discord.SelectOption(label="📝 ห้องปุ่มแจ้งลา", value="leave_ch"),
             discord.SelectOption(label="📋 ตาราง Real-time", value="realtime_ch"),
@@ -1041,23 +1001,22 @@ class CategorySelectionView(discord.ui.View):
             discord.SelectOption(label="📊 ประวัติรายวัน", value="daily_ch"),
             discord.SelectOption(label="📊 สรุปประวัติรายสัปดาห์", value="weekly_ch"),
         ]
-        # เมื่อเปลี่ยนหน้าเมนู แนะนำให้ใช้ View ใหม่ที่รองรับ Persistent เช่นกัน
-        await it.response.edit_message(content="🛠 **ระบบแจ้งลา:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(it, AdminCatSelect(opts)))
+        await interaction.response.edit_message(content="🛠 **ระบบแจ้งลา:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)))
 
     @discord.ui.button(label="💰 ระบบแจ้งปรับเงิน", style=discord.ButtonStyle.primary, custom_id="setup_fine_system")
-    async def fine_system_setup(self, it: discord.Interaction, button: discord.ui.Button):
+    async def fine_system_setup(self, interaction: discord.Interaction, button: discord.ui.Button):
         opts = [
             discord.SelectOption(label="📋 แจ้งค่าปรับ Real-time", value="fine_realtime_ch"),
             discord.SelectOption(label="📌 Log การปรับเงิน", value="fine_log_ch"),
             discord.SelectOption(label="✅ อนุมัติการชำระเงิน", value="fine_approve_ch"),
         ]
-        await it.response.edit_message(content="🛠 **ระบบแจ้งปรับเงิน:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(it, AdminCatSelect(opts)))
+        await interaction.response.edit_message(content="🛠 **ระบบแจ้งปรับเงิน:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)))
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, custom_id="admin_close_setup_category")
-    async def close_menu(self, it: discord.Interaction, button: discord.ui.Button):
+    async def close_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
-            await it.response.defer()
-            await it.delete_original_response()
+            await interaction.response.defer()
+            await interaction.delete_original_response()
         except:
             pass    
 
@@ -1393,12 +1352,10 @@ class AdminLeaveManagementView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="⚙️ จัดการใบลาทั้งหมด", style=discord.ButtonStyle.primary, custom_id="admin_manage_all_leaves_v2")
-    async def manage_all(self, it: discord.Interaction, b):
-        gid = str(it.guild.id)
-        d = load_data(gid, "leaves", []) # โหลดข้อมูลแยกตาม Guild
+    async def manage_all(self, interaction: discord.Interaction, button: discord.ui.Button):
+        gid = str(interaction.guild.id)
+        d = load_data(gid, "leaves", [])
         now_date = get_thai_time().date()
-        
-        # [1] กำหนดเกณฑ์ย้อนหลัง 14 วัน
         limit_back_date = now_date - timedelta(days=14)
         all_opts = []
         
@@ -1409,32 +1366,27 @@ class AdminLeaveManagementView(discord.ui.View):
                     continue
             except: continue
             
-            target_m = it.guild.get_member(int(e['target_id']))
+            target_m = interaction.guild.get_member(int(e['target_id']))
             tn = target_m.display_name if target_m else e['name']
             dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
             
             all_opts.append(discord.SelectOption(
                 label=f"{tn} | {dr}",
-                description=f"โดย: {it.guild.get_member(int(e['user_id'])).display_name if it.guild.get_member(int(e['user_id'])) else 'ระบบ'}",
+                description=f"โดย: {interaction.guild.get_member(int(e['user_id'])).display_name if interaction.guild.get_member(int(e['user_id'])) else 'ระบบ'}",
                 value=str(i)
             ))
             
         if not all_opts: 
-            return await it.response.send_message("🍃 **ขณะนี้ไม่มีรายการใบลาที่กำลังดำเนินการอยู่**", ephemeral=True)
+            return await interaction.response.send_message("🍃 **ขณะนี้ไม่มีรายการใบลาที่กำลังดำเนินการอยู่**", ephemeral=True)
 
-        # --- [ปรับปรุง Logic การใส่ Dropdown และต่อปุ่มปิดเมนูไว้ล่างสุด] ---
         view = discord.ui.View(timeout=300)
-        
-        # 1. ใส่ Dropdown ให้ครบทุกหน้าก่อน
         for start in range(0, len(all_opts), 25):
             end = start + 25
             chunk = all_opts[start:end]
             placeholder_text = f"🔍 เลือกใบลา (รายการที่ {start+1}-{min(end, len(all_opts))})..."
             view.add_item(AdminActionSelect(chunk, placeholder_text))
             
-        # 2. สร้างปุ่มปิดเมนูต่อท้ายสุด (จะอยู่บรรทัดล่างสุดเสมอ)
         close_btn = discord.ui.Button(label="ปิดเมนู", style=discord.ButtonStyle.danger)
-        
         async def close_callback(btn_it: discord.Interaction):
             await btn_it.response.defer()
             try: await btn_it.delete_original_response()
@@ -1442,28 +1394,27 @@ class AdminLeaveManagementView(discord.ui.View):
             
         close_btn.callback = close_callback
         view.add_item(close_btn)
-        # -----------------------------------------------------------------
             
-        await it.response.edit_message(
+        await interaction.response.edit_message(
             content="🛠 **แอดมินจัดการใบลา:** เลือกรายการที่ต้องการจัดการ:", 
             view=view
         )
 
     @discord.ui.button(label="📊 สรุปประวัติการลา (รายเดือน)", style=discord.ButtonStyle.primary, custom_id="admin_monthly_history_btn")
-    async def history_monthly(self, it: discord.Interaction, b):
-        await it.response.defer(ephemeral=True)
-        await send_month_selection(it)
+    async def history_monthly(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        await send_month_selection(interaction)
 
     @discord.ui.button(label="🗑️ ล้างข้อมูลใบลา (120 วัน)", style=discord.ButtonStyle.primary, custom_id="admin_cleanup_trigger_v2")
-    async def cleanup(self, it: discord.Interaction, b):
+    async def cleanup(self, interaction: discord.Interaction, button: discord.ui.Button):
         txt = "⚠️ **คุณยืนยันที่จะ Cleanup ข้อมูลใบลาที่เก่ากว่า 4 เดือน (120 วัน) ใช่หรือไม่?**\nระบบจะส่งไฟล์ Backup ให้คุณก่อนดำเนินการ"
-        await it.response.send_message(content=txt, view=ConfirmClearView(), ephemeral=True)
+        await interaction.response.send_message(content=txt, view=ConfirmClearView(), ephemeral=True)
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, custom_id="admin_close_leave_system_v2")
-    async def close_menu(self, it: discord.Interaction, b):
+    async def close_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
-            await it.response.defer()
-            await it.delete_original_response()
+            await interaction.response.defer()
+            await interaction.delete_original_response()
         except: pass
 
 class AdminActionSelect(discord.ui.Select):
@@ -2095,50 +2046,38 @@ class LeaveMainView(discord.ui.View):
         super().__init__(timeout=None)
         
     @discord.ui.button(label="📝 แจ้งลา", style=discord.ButtonStyle.success, custom_id="v_l_final_vMaster_DMD_master_1")
-    async def l_me(self, it, b):
-        await it.response.send_message("🤔 **ลาช่วงไหน:**", view=DateSelectView(), ephemeral=True)
+    async def l_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🤔 **ลาช่วงไหน:**", view=DateSelectView(), ephemeral=True)
 
     @discord.ui.button(label="👥 ลาแทนเพื่อน", style=discord.ButtonStyle.primary, custom_id="v_l_final_vMaster_DMD_master_2")
-    async def l_fr(self, it, b):
-        await it.response.send_message("👤 เลือกเพื่อน:", view=SubMenuView(it, FriendSelect()), ephemeral=True)   
+    async def l_fr(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("👤 เลือกเพื่อน:", view=SubMenuView(interaction, FriendSelect()), ephemeral=True)   
     
     @discord.ui.button(label="❌ ยกเลิกการลา", style=discord.ButtonStyle.danger, custom_id="v_l_final_vMaster_DMD_master_3")
-    async def l_cn(self, it: discord.Interaction, b: discord.ui.Button):
-        gid = str(it.guild.id)
-        d = load_data(gid, "leaves", []) # โหลดข้อมูลใบลาของเซิร์ฟเวอร์นี้[cite: 4]
-        
-        u_id = str(it.user.id)
+    async def l_cn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        gid = str(interaction.guild.id)
+        d = load_data(gid, "leaves", [])
+        u_id = str(interaction.user.id)
         now_date = get_thai_time().date()
         opts = []
-        has_blocked_leave = False # ตัวแปรเช็กว่ามีใบลาที่ติดเงื่อนไขโดนบล็อกหรือไม่
+        has_blocked_leave = False
         
         for i, e in enumerate(d):
-            # แสดงเฉพาะใบลาที่ตนเองมีส่วนเกี่ยวข้อง[cite: 4]
             if e['user_id'] == u_id or e['target_id'] == u_id:
                 try:
                     s_date = datetime.strptime(e['start_date'], "%d/%m/%Y").date()
                     e_date = datetime.strptime(e['end_date'], "%d/%m/%Y").date()
-                    
-                    # กรองใบลาที่หมดอายุย้อนหลังไปแล้วออก
-                    if e_date < now_date: 
-                        continue
-                    
-                    # --- [เงื่อนไขใหม่: บล็อกเฉพาะใบลาหลายวัน ที่เลยวันแรกไปแล้ว (s_date < now_date)] ---
+                    if e_date < now_date: continue
                     is_multi_day = e['start_date'] != e['end_date']
-                    is_past_first_day = s_date < now_date # วันเริ่มลาน้อยกว่าวันนี้ (เช่น ลาเริ่ม 16 แต่วันนี้วันที่ 17)
-                    
+                    is_past_first_day = s_date < now_date
                     if is_multi_day and is_past_first_day:
                         has_blocked_leave = True
-                        continue # ข้ามรายการนี้ ไม่นำไปใส่ในตัวเลือกยกเลิก
-                    # -------------------------------------------------------------
-                except: 
-                    continue
+                        continue
+                except: continue
                 
-                target_member = it.guild.get_member(int(e['target_id']))
+                target_member = interaction.guild.get_member(int(e['target_id']))
                 tn = target_member.display_name if target_member else e['name']
                 dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
-                
-                # 🟢 แก้ไข 2 บรรทัดนี้ (เรียกใช้ format_categories):
                 cat_txt = format_categories(e.get('leave_category', 'ทั่วไป'))
                 opts.append(discord.SelectOption(
                     label=f"{tn} | {dr} ({e.get('total_days', 1)} วัน)",
@@ -2153,33 +2092,27 @@ class LeaveMainView(discord.ui.View):
                     "⚠️ *หมายเหตุ: รายการที่ผ่านวันเริ่มลาไปแล้ว ไม่สามารถยกเลิกทั้งใบได้ "
                     "หากคุณกลับมาก่อนกำหนด กรุณาใช้ปุ่ม **'✏️ แก้ไขวันลา'** เพื่อปรับวันสิ้นสุดแทน*"
                 )
-                return await it.response.send_message(msg, ephemeral=True)
+                return await interaction.response.send_message(msg, ephemeral=True)
             else:
-                return await it.response.send_message("❌ ไม่พบรายการที่คุณสามารถยกเลิกได้", ephemeral=True)
+                return await interaction.response.send_message("❌ ไม่พบรายการที่คุณสามารถยกเลิกได้", ephemeral=True)
             
-        await it.response.send_message("📋 เลือกใบลาของคุณที่จะยกเลิก:", view=SubMenuView(it, CancelSelect(opts[:25])), ephemeral=True)
+        await interaction.response.send_message("📋 เลือกใบลาของคุณที่จะยกเลิก:", view=SubMenuView(interaction, CancelSelect(opts[:25])), ephemeral=True)
   
     @discord.ui.button(label="✏️ แก้ไขวันลา", style=discord.ButtonStyle.danger, custom_id="v_l_final_vMaster_DMD_master_4")
-    async def l_ed(self, it: discord.Interaction, b: discord.ui.Button):
-        # --- เริ่มการแก้ไข Logic แยกไฟล์ตาม Guild ---[cite: 1]
-        gid = str(it.guild.id)
-        d = load_data(gid, "leaves", []) # โหลดข้อมูลใบลาของเซิร์ฟเวอร์นี้[cite: 1]
-        
-        u_id, now_date, opts = str(it.user.id), get_thai_time().date(), []
+    async def l_ed(self, interaction: discord.Interaction, button: discord.ui.Button):
+        gid = str(interaction.guild.id)
+        d = load_data(gid, "leaves", [])
+        u_id, now_date, opts = str(interaction.user.id), get_thai_time().date(), []
 
         for i, e in enumerate(d):
-            # เงื่อนไขเดิม: ต้องเกี่ยวข้อง และเป็นการลามากกว่า 1 วัน[cite: 1]
             if (e['user_id'] == u_id or e['target_id'] == u_id) and e['start_date'] != e['end_date']:
                 try:
                     if datetime.strptime(e['end_date'], "%d/%m/%Y").date() < now_date: continue
                 except: continue
                 
-                target_member = it.guild.get_member(int(e['target_id']))
+                target_member = interaction.guild.get_member(int(e['target_id']))
                 tn = target_member.display_name if target_member else e['name']
                 dr = e['start_date'] if e['start_date'] == e['end_date'] else f"{e['start_date']} - {e['end_date']}"
-                
-                # คงคำพูดและ Emoji เดิมของคุณไว้ทั้งหมด[cite: 1]
-                # 🟢 แก้ไข 2 บรรทัดนี้ (เรียกใช้ format_categories):
                 cat_txt = format_categories(e.get('leave_category', 'ทั่วไป'))
                 opts.append(discord.SelectOption(
                     label=f"{tn} | {dr} ({e.get('total_days', 1)} วัน)",
@@ -2188,9 +2121,9 @@ class LeaveMainView(discord.ui.View):
                 ))
         
         if not opts: 
-            return await it.response.send_message("❌ ไม่พบรายการที่คุณสามารถแก้ไขได้", ephemeral=True)
+            return await interaction.response.send_message("❌ ไม่พบรายการที่คุณสามารถแก้ไขได้", ephemeral=True)
             
-        await it.response.send_message("✏️ เลือกใบลาของคุณที่จะแก้ไข:", view=SubMenuView(it, EditLeaveSelect(opts[:25], it)), ephemeral=True)   
+        await interaction.response.send_message("✏️ เลือกใบลาของคุณที่จะแก้ไข:", view=SubMenuView(interaction, EditLeaveSelect(opts[:25], interaction)), ephemeral=True)   
 
 
 class FriendSelect(discord.ui.Select):
@@ -2236,13 +2169,12 @@ class SubMenuView(discord.ui.View):
         super().__init__(timeout=60)
         self.o_it = o_it
         if item: self.add_item(item)
+
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=3)
-    async def cls(self, it, b):
-        await it.response.defer()
-        try:
-            await it.delete_original_response()
-        except:
-            pass
+    async def cls(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        try: await interaction.delete_original_response()
+        except: pass
 
 class DateSelect(discord.ui.Select):
     def __init__(self, t_id=None):
