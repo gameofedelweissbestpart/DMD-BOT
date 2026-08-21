@@ -853,12 +853,12 @@ class LeaveModal(discord.ui.Modal):
         self.s_v, self.e_v = s_v, e_v
         
         if not is_f:
-            self.s_i = discord.ui.TextInput(label='เริ่มลาวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 25/04/2026', default=s_v, required=True)
-            self.e_i = discord.ui.TextInput(label='สิ้นสุดวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 30/04/2026', default=e_v, required=True)
+            self.s_i = discord.ui.TextInput(label='เริ่มลาวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 25/04/2026', value=s_v, required=True)
+            self.e_i = discord.ui.TextInput(label='สิ้นสุดวันที่ (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 30/04/2026', value=e_v, required=True)
             self.add_item(self.s_i)
             self.add_item(self.e_i)
         
-        self.re = discord.ui.TextInput(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.InputTextStyle.paragraph, default=old_re, required=True)
+        self.re = discord.ui.TextInput(label='เหตุผลการลา', placeholder='ระบุรายละเอียดเพิ่มเติม...', style=discord.InputTextStyle.paragraph, value=old_re, required=True)
         self.add_item(self.re)
     
     async def on_submit(self, it: discord.Interaction):
@@ -1889,9 +1889,9 @@ class AdminEditDetailsModal(discord.ui.Modal):
         super().__init__(title="แก้ไขใบลาแบบละเอียด (Admin)")
         self.idx, self.od, self.selected_cat = idx, od, selected_cat
         
-        self.s_i = discord.ui.TextInput(label="วันเริ่มลา (วว/ดด/ปปปป) *ค.ศ.*", default=od['start_date'], required=True)
-        self.e_i = discord.ui.TextInput(label="วันสิ้นสุด (วว/ดด/ปปปป) *ค.ศ.*", default=od['end_date'], required=True)
-        self.re = discord.ui.TextInput(label="เหตุผลการลา", style=discord.InputTextStyle.paragraph, default=od['reason'], required=True)
+        self.s_i = discord.ui.TextInput(label="วันเริ่มลา (วว/ดด/ปปปป) *ค.ศ.*", value=od['start_date'], required=True)
+        self.e_i = discord.ui.TextInput(label="วันสิ้นสุด (วว/ดด/ปปปป) *ค.ศ.*", value=od['end_date'], required=True)
+        self.re = discord.ui.TextInput(label="เหตุผลการลา", style=discord.InputTextStyle.paragraph, value=od['reason'], required=True)
         self.admin_re = discord.ui.TextInput(label="หมายเหตุจากแอดมิน (ทำไมถึงแก้?)", placeholder="ระบุเหตุผลเพื่อบันทึกใน Log...", required=True)
         
         self.add_item(self.s_i)
@@ -2521,12 +2521,16 @@ class LeaveMainView(discord.ui.View):
         await it.response.send_message("✏️ เลือกใบลาของคุณที่จะแก้ไข:", view=SubMenuView(it, EditLeaveSelect(opts[:25], it)), ephemeral=True)   
 
 
-class FriendSelect(discord.ui.UserSelect):
+class FriendSelect(discord.ui.Select):
     def __init__(self):
-        super().__init__(placeholder="👤 เลือกเพื่อน...", min_values=1, max_values=1)
+        super().__init__(
+            select_type=discord.ComponentType.user_select,
+            placeholder="👤 เลือกเพื่อน...",
+            min_values=1,
+            max_values=1
+        )
     async def callback(self, it):
         t_id = str(self.values[0].id)
-        # 🟢 แสดงแท็กชื่อเพื่อน และส่งต่อไปยัง DateSelectView
         await it.response.edit_message(
             content=f"🎯 **ลาแทนคุณ:** {self.values[0].mention}\n👉 **กรุณาเลือกวันที่ลาด้านล่าง:**", 
             view=DateSelectView(t_id=t_id)
