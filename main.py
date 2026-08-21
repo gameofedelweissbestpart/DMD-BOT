@@ -184,6 +184,7 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
     return embed
 
 
+# --- [แก้ไขจุดที่ 1: คลาส RerollConfirmModal] ---
 class RerollConfirmModal(discord.ui.Modal):
     def __init__(self, session: RandomSession, selected_exempt_ids: List[int], parent_view: discord.ui.View):
         super().__init__(title="🔄 ยืนยันการสุ่มใหม่อีกรอบ")
@@ -198,12 +199,13 @@ class RerollConfirmModal(discord.ui.Modal):
         required=False
     )
 
-    async def on_submit(self, interaction: discord.Interaction):
+    # เปลี่ยนเป็น callback และใส่ defer ทันที
+    async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         self.session.round_count += 1
         new_embed = generate_random_result(self.session, self.selected_exempt_ids, interaction.user)
         
-        # 🔴 1. ลบเมนูตั้งค่าสุ่มใหม่ออกทันที
+        # ลบหน้าต่างเลือกยกเว้นคนเพิ่มออกทันที ไม่ทิ้งค้างไว้
         try:
             await interaction.delete_original_response()
         except:
@@ -219,15 +221,17 @@ class RerollConfirmModal(discord.ui.Modal):
                 role_mention = f"🔔 <@&{self.session.role_tag_id}>\n" if self.session.role_tag_id else ""
                 await msg.edit(content=role_mention, embed=new_embed, view=RerollView(self.session))
                 
-                # 🟡 2. แจ้งเตือนสุ่มใหม่สำเร็จ -> ค้างไว้ 5 วินาทีแล้วลบ
                 msg_ok = await interaction.followup.send("✅ **สุ่มใหม่และอัปเดตผลลัพธ์ในห้องประกาศเรียบร้อยแล้ว!**", ephemeral=True)
-                await asyncio.sleep(5)
+                await asyncio.sleep(3)
                 try: await msg_ok.delete()
                 except: pass
             except Exception as e:
                 await interaction.followup.send(f"❌ **เกิดข้อผิดพลาดในการอัปเดตข้อความประกาศ:** {e}", ephemeral=True)
         else:
             await interaction.followup.send("❌ **ไม่พบห้องประกาศผล**", ephemeral=True)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.callback(interaction)
 
 class RerollExemptSelectView(discord.ui.View):
     def __init__(self, session: RandomSession):
@@ -878,7 +882,12 @@ class RetryView(discord.ui.View):
         self.title, self.s, self.e, self.cat, self.t_id, self.is_f, self.re_val = title, s, e, cat, t_id, is_f, re_val
 
     @discord.ui.button(label="📝 แก้ไขข้อมูลอีกครั้ง", style=discord.ButtonStyle.primary)
-    async def retry(self, button: discord.ui.Button, interaction: discord.Interaction): # 👈 [แก้ไข] สลับให้ button อยู่ก่อน interaction
+    async def retry(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # ลบข้อความแจ้งเตือนสีแดง/เหลืองเดิมทิ้งทันที เพื่อไม่ให้รกหน้าจอ
+        try:
+            await interaction.message.delete()
+        except:
+            pass
         await interaction.response.send_modal(LeaveModal(self.title, self.s, self.e, self.cat, self.t_id, self.is_f, self.re_val))
 
 # --- 4. ส่วน Admin (ปรับหัวข้อหน้าหลักตามสั่ง + หมายเหตุใหม่) ---
@@ -1559,7 +1568,8 @@ class AdminEditDetailsModal(discord.ui.Modal):
         self.add_item(self.re)
         self.add_item(self.admin_re)
 
-    async def on_submit(self, it: discord.Interaction):
+    # เปลี่ยนชื่อเป็น callback
+    async def callback(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
         gid = str(it.guild.id)
         
@@ -1588,24 +1598,17 @@ class AdminEditDetailsModal(discord.ui.Modal):
             except:
                 return await it.followup.send("❌ เกิดข้อผิดพลาดในการคำนวณวันที่!", ephemeral=True)
 
-            # --- [เริ่มต้น Logic เปรียบเทียบตามเงื่อนไขใหม่] ---
-            # 1. วันที่ลา
             if old_s == new_s and old_e == new_e:
                 date_txt = f"`{old_s}-{old_e}` (คงเดิม)"
             else:
                 date_txt = f"`{old_s}-{old_e}` ➔ **`{new_s}-{new_e}`**"
 
-            # 2. ประเภทการลา (ใช้ format_categories แปลงให้เป็นกล่องสีเทาสวยงาม)
             old_cat_str = format_categories(old_cat)
             new_cat_str = format_categories(self.selected_cat)
             cat_txt = f"{old_cat_str} (คงเดิม)" if old_cat == self.selected_cat else f"{old_cat_str} ➔ **{new_cat_str}**"
             
-            # 3. จำนวนวัน
             days_txt = f"`{old_days}` วัน (คงเดิม)" if old_days == new_days else f"`{old_days}` ➔ **`{new_days}` วัน**"
-            
-            # 4. เหตุผล
             reason_txt = f"`{old_reason}` (คงเดิม)" if old_reason == new_reason else f"`{old_reason}` ➔ **`{new_reason}`**"
-            # --- [จบ Logic เปรียบเทียบ] ---
 
             entry.update({
                 "start_date": new_s, 
@@ -1627,7 +1630,6 @@ class AdminEditDetailsModal(discord.ui.Modal):
                     tn = target_m.display_name if target_m else self.od['name']
                     
                     em = discord.Embed(title="📌 บันทึกการจัดการโดยผู้ดูแล (แก้ไขใบลา)", color=0xe67e22)
-                    # ใช้คำพูดเดิม 100% แทรกตัวแปรที่มี Logic ใหม่เข้าไป
                     em.description = (
                         f"**👤 สมาชิกที่ลา:** {tn}\n"
                         f"**👮 ผู้ดำเนินการ:** {it.user.display_name} (Admin)\n\n"
@@ -1640,12 +1642,15 @@ class AdminEditDetailsModal(discord.ui.Modal):
                         f"{LONG_SEP}"
                     )
                     em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
-                    await log_ch.send(embed=em)
+                    await log_ch.send(embed=log_em)
 
-            await it.edit_original_response(content="✅ อัปเดตข้อมูลใบลาเรียบร้อยแล้ว!", view=None)        
+            msg_edited = await it.followup.send(content="✅ อัปเดตข้อมูลใบลาเรียบร้อยแล้ว!", ephemeral=True)       
             await asyncio.sleep(3) 
-            try: await it.delete_original_response() 
-            except: pass        
+            try: await msg_edited.delete()
+            except: pass
+
+    async def on_submit(self, it: discord.Interaction):
+        await self.callback(it)
 
 # --- 5. งานรายวัน (ฉบับแก้ไข Syntax + นับจำนวนคนแบบ Unique) ---
 # --- ฟังก์ชันสรุปรายวัน (คงคำพูดเดิม 100% / แก้ Logic แยกไฟล์ตาม Guild) ---
@@ -1785,7 +1790,8 @@ class CancelReasonModal(discord.ui.Modal):
         self.reason = discord.ui.InputText(label='เหตุผลที่ยกเลิก', placeholder='ระบุเหตุผลที่นี่...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
     
-    async def on_submit(self, it: discord.Interaction):
+    # เปลี่ยนชื่อเป็น callback
+    async def callback(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
         gid = str(it.guild.id)
         
@@ -1794,7 +1800,6 @@ class CancelReasonModal(discord.ui.Modal):
             old_data = d.pop(self.target_idx)
             save_data(gid, "leaves", d)
             
-            # --- [บันทึกข้อมูลใบลาที่ถูกยกเลิกลงไฟล์ cancelled_leaves.json] ---
             cancelled_data = load_data(gid, "cancelled_leaves", [])
             cancelled_entry = old_data.copy()
             cancelled_entry.update({
@@ -1806,7 +1811,6 @@ class CancelReasonModal(discord.ui.Modal):
             })
             cancelled_data.append(cancelled_entry)
             save_data(gid, "cancelled_leaves", cancelled_data)
-            # -----------------------------------------------------------------
 
             await update_summary_board(it.guild)
             
@@ -1848,10 +1852,13 @@ class CancelReasonModal(discord.ui.Modal):
                     log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
                     await log_ch.send(embed=log_em)
             
-            await it.edit_original_response(content=f"❌ ยกเลิกรายการแจ้งลาเรียบร้อยแล้ว!", view=None)
+            msg_cancelled = await it.followup.send(content="❌ ยกเลิกรายการแจ้งลาเรียบร้อยแล้ว!", ephemeral=True)
             await asyncio.sleep(3)
-            try: await it.delete_original_response()
+            try: await msg_cancelled.delete()
             except: pass
+
+    async def on_submit(self, it: discord.Interaction):
+        await self.callback(it)
 
 class ConfirmCancelView(discord.ui.View):
     def __init__(self, target_idx, od):
@@ -1946,9 +1953,14 @@ class EditReasonModal(discord.ui.Modal):
         self.idx, self.od, self.new_end = idx, od, new_end
         self.reason = discord.ui.InputText(label='เหตุผลที่ขอแก้ไข', placeholder='ระบุรายละเอียด...', style=discord.InputTextStyle.paragraph, required=True)
         self.add_item(self.reason)
-    async def on_submit(self, it: discord.Interaction):
+
+    # เปลี่ยนชื่อเป็น callback
+    async def callback(self, it: discord.Interaction):
         await it.response.defer(ephemeral=True)
         await process_edit_leave(it, self.idx, self.od, self.new_end, self.reason.value)
+
+    async def on_submit(self, it: discord.Interaction):
+        await self.callback(it)
 
 class EditRetryView(discord.ui.View):
     def __init__(self, idx, od, p_it):
@@ -1972,17 +1984,16 @@ class EditDateModal(discord.ui.Modal):
         self.new_e = discord.ui.InputText(label='วันที่กลับมาจริง (วว/ดด/ปปปป) *ใช้ ค.ศ. เท่านั้น', placeholder='ตัวอย่าง: 28/04/2026', required=True)
         self.add_item(self.new_e)
 
-    async def on_submit(self, it: discord.Interaction):
+    # เปลี่ยนชื่อเป็น callback
+    async def callback(self, it: discord.Interaction):
         val = self.new_e.value.strip()
         
-        # ตรวจสอบรูปแบบวันที่ (คงคำพูดเดิม)
         if not validate_date(val):
             return await it.response.send_message("❌ รูปแบบวันที่ไม่ถูกต้อง หรือไม่ใช่ปี ค.ศ.!", view=EditRetryView(self.idx, self.od, self.parent_it), ephemeral=True)
         
         s_dt = datetime.strptime(self.od['start_date'], "%d/%m/%Y")
         e_dt = datetime.strptime(val, "%d/%m/%Y")
         
-        # ตรวจสอบเงื่อนไขวันที่ (คงคำพูดเดิม)
         if e_dt < s_dt:
             return await it.response.send_message("❌ วันที่กลับมาจริงต้องไม่มาก่อนวันที่เริ่มลา!", view=EditRetryView(self.idx, self.od, self.parent_it), ephemeral=True)
         
@@ -1998,7 +2009,6 @@ class EditDateModal(discord.ui.Modal):
         diff = new_days - old_days
         diff_txt = f"เพิ่มขึ้น {diff} วัน" if diff > 0 else f"ลดลง {abs(diff)} วัน" if diff < 0 else "จำนวนวันเท่าเดิม"
         
-        # แสดง Embed ตรวจสอบข้อมูล (คงคำพูดเดิม)
         em = discord.Embed(title="ตรวจสอบความถูกต้องก่อนยืนยัน", color=0xffffff)
         em.description = (
             f"**👤 สมาชิก:** <@{self.od['target_id']}>\n"
@@ -2008,6 +2018,9 @@ class EditDateModal(discord.ui.Modal):
             f"**ยืนยันการแก้ไขข้อมูลหรือไม่?**"
         )
         await it.response.send_message(embed=em, view=ConfirmEditView(self.idx, self.od, val), ephemeral=True)
+
+    async def on_submit(self, it: discord.Interaction):
+        await self.callback(it)
 
 class ConfirmEditView(discord.ui.View):
     def __init__(self, idx, od, new_end):
@@ -2260,8 +2273,13 @@ class LeaveCategoryView(discord.ui.View):
         else:
             final_cat = self.selected_cats
 
-        # 👈 [แก้ไข] เอาการลบข้อความเดิมออก เพื่อไม่ให้ Token ของแบบฟอร์มหลุด
         await interaction.response.send_modal(LeaveModal(self.m_title, self.s_v, self.e_v, final_cat, self.t_id, self.is_f))
+        
+        # ลบเมนูเลือกประเภทการลาเดิมออกจากหน้าจอแชททันที
+        try:
+            await interaction.delete_original_response()
+        except:
+            pass
 
     @discord.ui.button(label="🔙 ย้อนกลับไปเลือกวัน", style=discord.ButtonStyle.secondary, row=1)
     async def back_to_date(self, button: discord.ui.Button, interaction: discord.Interaction):
