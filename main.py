@@ -398,13 +398,13 @@ class RandomStep2ConfigView(discord.ui.View):
                     r = discord.Object(id=self.session.role_tag_id)
                     item.default_values = [r]
 
-    @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.text], placeholder="📢 1. เลือกห้องส่งผลประกาศ (บังคับเลือก)...")
-    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect):
+    @discord.ui.select(select_type=discord.ComponentType.channel_select, channel_types=[discord.ChannelType.text], placeholder="📢 1. เลือกห้องส่งผลประกาศ (บังคับเลือก)...")
+    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         self.session.target_channel_id = select.values[0].id
         await self.update_msg(interaction)
 
-    @discord.ui.select(cls=discord.ui.RoleSelect, placeholder="🔔 2. เลือกยศที่จะแท็กแจ้งเตือน (ไม่เลือกก็ได้)...", min_values=0, max_values=1)
-    async def role_select(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
+    @discord.ui.select(select_type=discord.ComponentType.role_select, placeholder="🔔 2. เลือกยศที่จะแท็กแจ้งเตือน (ไม่เลือกก็ได้)...", min_values=0, max_values=1)
+    async def role_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         if select.values:
             self.session.role_tag_id = select.values[0].id
         else:
@@ -482,13 +482,13 @@ class RandomStep1ExemptView(discord.ui.View):
         self.render_member_selects()
 
     @discord.ui.select(
-        cls=discord.ui.RoleSelect,
+        select_type=discord.ComponentType.role_select,
         placeholder="🏷️ Filter เลือกยศที่ต้องการสุ่ม (ไม่เลือก = สุ่มทุกคน)...",
         min_values=0,
         max_values=1,
         row=0
     )
-    async def role_filter_select(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
+    async def role_filter_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         if select.values:
             selected_role = select.values[0]
             self.session.members = [m for m in selected_role.members if not m.bot]
