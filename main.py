@@ -291,9 +291,9 @@ def generate_random_result(session: RandomSession, new_exempt_ids: List[int], ac
     return embed
 
 
-class RerollConfirmModal(discord.ui.Modal, title="🔄 ยืนยันการสุ่มใหม่อีกรอบ"):
+class RerollConfirmModal(discord.ui.Modal):
     def __init__(self, session: RandomSession, selected_exempt_ids: List[int], parent_view: discord.ui.View):
-        super().__init__()
+        super().__init__(title="🔄 ยืนยันการสุ่มใหม่อีกรอบ")
         self.session = session
         self.selected_exempt_ids = selected_exempt_ids
         self.parent_view = parent_view
@@ -1231,11 +1231,11 @@ class MemberWeaponUpdateView(discord.ui.View):
         try: await interaction.delete_original_response()
         except: pass
 
-class AdminSlotAssignModal(discord.ui.Modal, title="⚙️ เพิ่มรายชื่อสมาชิกเข้าสล็อต"):
+class AdminSlotAssignModal(discord.ui.Modal):
     slot_num = discord.ui.TextInput(label="🔢 หมายเลขสล็อต (1-30)", placeholder="เช่น 4 หรือ 12", max_length=2)
 
     def __init__(self, target_member: discord.Member):
-        super().__init__()
+        super().__init__(title="⚙️ เพิ่มรายชื่อสมาชิกเข้าสล็อต")
         self.target_member = target_member
 
     async def on_submit(self, interaction: discord.Interaction):
