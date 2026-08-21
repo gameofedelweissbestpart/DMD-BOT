@@ -382,6 +382,7 @@ class RandomNumberInputModal(discord.ui.Modal):
         try: await followup_msg.delete()
         except: pass
 
+# --- คลาส RandomStep2ConfigView (ตั้งค่าห้องส่งผลและยศ row=0 และ row=1, ปุ่มกด row=2 อยู่ด้านล่าง) ---
 class RandomStep2ConfigView(discord.ui.View):
     def __init__(self, session: RandomSession):
         super().__init__(timeout=300)
@@ -398,12 +399,12 @@ class RandomStep2ConfigView(discord.ui.View):
                     r = discord.Object(id=self.session.role_tag_id)
                     item.default_values = [r]
 
-    @discord.ui.select(select_type=discord.ComponentType.channel_select, channel_types=[discord.ChannelType.text], placeholder="📢 1. เลือกห้องส่งผลประกาศ (บังคับเลือก)...")
+    @discord.ui.select(select_type=discord.ComponentType.channel_select, channel_types=[discord.ChannelType.text], placeholder="📢 1. เลือกห้องส่งผลประกาศ (บังคับเลือก)...", row=0)
     async def channel_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         self.session.target_channel_id = select.values[0].id
         await self.update_msg(interaction)
 
-    @discord.ui.select(select_type=discord.ComponentType.role_select, placeholder="🔔 2. เลือกยศที่จะแท็กแจ้งเตือน (ไม่เลือกก็ได้)...", min_values=0, max_values=1)
+    @discord.ui.select(select_type=discord.ComponentType.role_select, placeholder="🔔 2. เลือกยศที่จะแท็กแจ้งเตือน (ไม่เลือกก็ได้)...", min_values=0, max_values=1, row=1)
     async def role_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         if select.values:
             self.session.role_tag_id = select.values[0].id
@@ -431,7 +432,6 @@ class RandomStep2ConfigView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=self)
 
-    # 🟢 เพิ่มการตั้งเวลาลบข้อความเตือนอัตโนมัติภายใน 5 วินาที
     @discord.ui.button(label="🎲 ระบุตัวเลขและเริ่มสุ่ม", style=discord.ButtonStyle.success, row=2)
     async def start_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.session.target_channel_id:
@@ -914,17 +914,20 @@ class ConfirmClearView(discord.ui.View):
             await interaction.delete_original_response()
         except: pass
 
+# --- คลาส AdminSubChannelSelect (ดรอปดาวน์เลือกห้องแอดมิน ให้อยู่ row=0) ---
 class AdminSubChannelSelect(discord.ui.Select):
     def __init__(self):
         super().__init__(
             select_type=discord.ComponentType.channel_select,
             placeholder="🔍 ค้นหาห้องที่ต้องการ...",
-            channel_types=[discord.ChannelType.text]
+            channel_types=[discord.ChannelType.text],
+            row=0  # บังคับให้อยู่แถวบน
         )
     async def callback(self, it: discord.Interaction):
         self.view.temp_ch = self.values[0].id
         await it.response.edit_message(content=f"📍 เลือกห้อง: {self.values[0].mention}\n👉 **กรุณากดยืนยันด้านล่างเพื่อบันทึกครับ**")
 
+# --- คลาส AdminSubMenuView (ปุ่มยืนยันตั้งค่า อยู่ row=1 อยู่ใต้ดรอปดาวน์) ---
 class AdminSubMenuView(discord.ui.View):
     def __init__(self, cat):
         super().__init__(timeout=None)
@@ -932,7 +935,7 @@ class AdminSubMenuView(discord.ui.View):
         self.temp_ch = None
         self.add_item(AdminSubChannelSelect())
 
-    @discord.ui.button(label="ยืนยันตั้งค่า", style=discord.ButtonStyle.success, custom_id="admin_save_room_config")
+    @discord.ui.button(label="ยืนยันตั้งค่า", style=discord.ButtonStyle.success, custom_id="admin_save_room_config", row=1)
     async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction):
         if not self.temp_ch:
             return await interaction.response.send_message("❌ กรุณาเลือกห้องก่อน!", ephemeral=True)
@@ -2148,6 +2151,7 @@ class FriendSelect(discord.ui.Select):
 
 # 🟢 คลาสจัดการเมนูเลือกวัน (ตั้ง timeout 300 วิ + มีปุ่มย้อนกลับไปเลือกเพื่อนใหม่)
 # 🟢 คลาสจัดการหน้าเลือกวัน (มีปุ่มย้อนกลับไปเลือกเพื่อนใหม่ ถ้าเป็นการลาแทนเพื่อน)
+# --- คลาส DateSelectView (ปุ่มเลือกเพื่อนใหม่/ปิดเมนู อยู่ row=1 อยู่ใต้ดรอปดาวน์) ---
 class DateSelectView(discord.ui.View):
     def __init__(self, t_id=None):
         super().__init__(timeout=300)
@@ -2181,11 +2185,12 @@ class SubMenuView(discord.ui.View):
         try: await interaction.delete_original_response()
         except: pass
 
+# --- คลาส DateSelect (ดรอปดาวน์เลือกวันที่ลา อยู่ row=0) ---
 class DateSelect(discord.ui.Select):
     def __init__(self, t_id=None):
         self.t_id = t_id
         opts = [discord.SelectOption(label="ลาวันนี้", value="t"), discord.SelectOption(label="ลาพรุ่งนี้", value="tm"), discord.SelectOption(label="ลาแบบระบุวันเอง", value="m")]
-        super().__init__(placeholder="📅 เลือกวันที่ลา...", options=opts)
+        super().__init__(placeholder="📅 เลือกวันที่ลา...", options=opts, row=0) # บังคับ row=0
     async def callback(self, it):
         now = get_thai_time()
         val = self.values[0]
@@ -2193,7 +2198,6 @@ class DateSelect(discord.ui.Select):
         elif val == "tm": title, s, e, is_fixed = "ลาพรุ่งนี้", (now + timedelta(days=1)).strftime("%d/%m/%Y"), (now + timedelta(days=1)).strftime("%d/%m/%Y"), True
         else: title, s, e, is_fixed = "ลาแบบระบุวันเอง", "", "", False
 
-        # 🟢 แสดงแปะแท็กชื่อเพื่อนในขั้นตอนเลือกประเภท
         prefix = f"✅ **ลาแทนคุณ:** <@{self.t_id}>\n" if self.t_id else ""
         content_text = (
             f"{prefix}"
@@ -2202,6 +2206,7 @@ class DateSelect(discord.ui.Select):
         )
         await it.response.edit_message(content=content_text, view=LeaveCategoryView(title, s, e, self.t_id, is_f=is_fixed))
 
+# --- คลาส LeaveCategorySelect (ดรอปดาวน์เลือกประเภทการลา ให้อยู่แถวแรก row=0) ---
 class LeaveCategorySelect(discord.ui.Select):
     def __init__(self):
         opts = [discord.SelectOption(label=x, emoji="📝") for x in LEAVE_CATEGORIES]
@@ -2209,7 +2214,8 @@ class LeaveCategorySelect(discord.ui.Select):
             placeholder="📝 เลือกประเภทการลา (เลือกได้หลายอัน)...", 
             min_values=1, 
             max_values=len(opts), 
-            options=opts
+            options=opts,
+            row=0  # บังคับให้อยู่แถวบนสุด
         )
         
     async def callback(self, it: discord.Interaction):
@@ -2217,6 +2223,7 @@ class LeaveCategorySelect(discord.ui.Select):
         self.view.selected_cats = self.values
         await it.response.defer()
 
+# --- คลาส LeaveCategoryView (ปุ่มยืนยัน/ย้อนกลับ อยู่แถวที่ row=1 จะได้อยู่ใต้ดรอปดาวน์) ---
 class LeaveCategoryView(discord.ui.View):
     def __init__(self, m_title, s_v, e_v, t_id=None, is_f=False):
         super().__init__(timeout=300)
