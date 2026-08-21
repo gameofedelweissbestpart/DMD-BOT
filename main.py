@@ -730,13 +730,19 @@ async def update_summary_board(guild):
 
 #refresh รีเฟรช
 class RealtimeRefreshView(discord.ui.View):
-    def __init__(self): super().__init__(timeout=None)
+    def __init__(self): 
+        super().__init__(timeout=None)
+
     @discord.ui.button(label="🔄 กดอัปเดตข้อมูลล่าสุด", style=discord.ButtonStyle.success, custom_id="refresh_realtime_board")
-    async def refresh_board(self, it: discord.Interaction, b: discord.ui.Button):
-        await it.response.send_message("🔄 กำลังอัปเดต...", ephemeral=True)
-        await update_summary_board(it.guild)
-        await it.edit_original_response(content="✅ อัปเดตข้อมูลล่าสุดเรียบร้อยแล้ว!")
-        await asyncio.sleep(3); await it.delete_original_response()
+    async def refresh_board(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.send_message("🔄 กำลังอัปเดต...", ephemeral=True)
+        await update_summary_board(interaction.guild)
+        await interaction.edit_original_response(content="✅ อัปเดตข้อมูลล่าสุดเรียบร้อยแล้ว!")
+        await asyncio.sleep(3)
+        try:
+            await interaction.delete_original_response()
+        except:
+            pass
 
 # --- 3. ระบบแจ้งลาและ Log (บังคับ ค.ศ. / ลาไม่เกิน 15 วัน / แยกสี Log) ---
 class LeaveModal(discord.ui.Modal):
@@ -1059,34 +1065,31 @@ class AdminPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    # 🟢 ลบ custom_id="admin_room_settings" ออก
-    @discord.ui.button(label="📍 ตั้งค่าห้องต่างๆ", style=discord.ButtonStyle.primary)
-    async def set_l(self, it: discord.Interaction, b: discord.ui.Button):
-        await it.response.send_message("📂 **เลือกหมวดหมู่ที่ต้องการจัดการ:**", view=CategorySelectionView(), ephemeral=True)
+    @discord.ui.button(label="📍 ตั้งค่าห้องต่างๆ", style=discord.ButtonStyle.primary, custom_id="admin_panel_set_l_btn")
+    async def set_l(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.send_message("📂 **เลือกหมวดหมู่ที่ต้องการจัดการ:**", view=CategorySelectionView(), ephemeral=True)
 
-    # 🟢 ลบ custom_id="admin_leave_system_main" ออก
-    @discord.ui.button(label="📋 ระบบลา", style=discord.ButtonStyle.primary)
-    async def leave_system(self, it: discord.Interaction, b: discord.ui.Button):
-        await it.response.send_message(
+    @discord.ui.button(label="📋 ระบบลา", style=discord.ButtonStyle.primary, custom_id="admin_panel_leave_sys_btn")
+    async def leave_system(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.send_message(
             content="📑 **เมนูจัดการระบบลา:** เลือกการดำเนินการที่ต้องการ", 
             view=AdminLeaveManagementView(), 
             ephemeral=True
         )
 
-    # 🟢 ลบ custom_id="admin_random_system_main" ออก
-    @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.primary)
-    async def random_system(self, it: discord.Interaction, b: discord.ui.Button):
-        members = [m for m in it.guild.members if not m.bot]
+    @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.primary, custom_id="admin_panel_random_sys_btn")
+    async def random_system(self, button: discord.ui.Button, interaction: discord.Interaction):
+        members = [m for m in interaction.guild.members if not m.bot]
         if not members:
-            await it.response.send_message("❌ ไม่พบสมาชิกในเซิร์ฟเวอร์", ephemeral=True)
+            await interaction.response.send_message("❌ ไม่พบสมาชิกในเซิร์ฟเวอร์", ephemeral=True)
             return
 
-        view = RandomModeView(author=it.user, members=members)
+        view = RandomModeView(author=interaction.user, members=members)
         text = (
             "🎲 **__เมนูเลือกรูปแบบการสุ่มรายชื่อ__**\n"
             "กรุณาเลือกรูปแบบการสุ่มที่ต้องการใช้งานด้านล่างครับ:"
         )
-        await it.response.send_message(content=text, view=view, ephemeral=True)
+        await interaction.response.send_message(content=text, view=view, ephemeral=True)
 
 
 # =====================================================================
