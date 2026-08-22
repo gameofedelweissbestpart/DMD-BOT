@@ -169,7 +169,7 @@ def generate_weapon_board_content(guild):
         f"📊 สรุปจำนวนปืนในแก๊ง [ สมาชิกปัจจุบัน: {current_members_count} คน ]\n\n"
         f"• ปืน +5: {c5} คน  │  ปืน +4: {c4} คน  │  ปืน +3: {c3} คน\n"
         f"• ปืน +2: {c2} คน  │  ปืน +1: {c1} คน  │  ปืน +0: {c0} คน\n"
-        f"• ยังไม่มีปืน: {c_no_gun} คน\n\n"
+        f"• ไม่มีปืน: {c_no_gun} คน\n\n"
         f"Update {now_str}"
     )
     
