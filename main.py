@@ -110,12 +110,14 @@ def save_weapons(guild_id, data):
 # --- 📌 แก้ไขฟังก์ชัน generate_weapon_board_content ---
 # 🟢 [แก้ไข] ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ (ปรับชื่อ 28 ตัวอักษร + ตัดหัวกล่องล่างออก)
 # 🟢 [แก้ไข] ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ (เอาเส้น │ หน้าคำว่า มีด ออก)
+# --- 📌 ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ (สรุปจำนวนปืน + สมาชิกปัจจุบัน [ สมาชิกปัจจุบัน: X คน ]) ---
 def generate_weapon_board_content(guild):
     gid = str(guild.id)
     weapons_data = load_weapons(gid)
     
     gun_counts = {"+5": 0, "+4": 0, "+3": 0, "+2": 0, "+1": 0, "+0": 0}
     slots_text_lines = []
+    current_members_count = 0  # 🟢 ตัวแปรนับจำนวนคนในสล็อตปัจจุบัน
     
     for i in range(1, 31):
         slot_key = f"{i:02d}"
@@ -123,11 +125,11 @@ def generate_weapon_board_content(guild):
         slot_info = weapons_data.get(slot_key)
         
         if slot_info and slot_info.get("user_id"):
+            current_members_count += 1  # เพิ่มจำนวนเมื่อเจอคนในสล็อต
             raw_name = slot_info.get("name", "Unknown")
             name = re.sub(r'^[\d\.\s]+', '', raw_name).strip()
             if not name: name = raw_name
             
-            # กำหนดระยะชื่อ 24 ตัวอักษร
             name_display = name[:24].ljust(24)
             
             knife = slot_info.get("knife", "-")
@@ -138,7 +140,6 @@ def generate_weapon_board_content(guild):
             if gun in gun_counts:
                 gun_counts[gun] += 1
                 
-            # 🟢 [แก้ไข] เอา │ หน้าคำว่า มีด ออก (เว้นช่องว่างแทนให้แนวตรงกัน)
             line = f"{slot_num_str}. {name_display}    มีด {knife:<2} │ มาเช {machete:<2} │ ไม้ {pool:<2} │ ปืน {gun:<2}"
         else:
             line = f"{slot_num_str}."
@@ -146,29 +147,33 @@ def generate_weapon_board_content(guild):
         
     now_str = get_thai_time().strftime("%d/%m/%Y เวลา %H:%M น.")
     
-    # กล่องที่ 1 (กล่องบน): หัวบอร์ด + สล็อต 01-30
-    part1 = f"⚔️ บอร์ดอัปเดตอาวุธ ⚔️\n\n"
-    part1 += "\n".join(slots_text_lines)
+    # 🟢 คำนวณหาจำนวน "ยังไม่มีปืน" (สมาชิกปัจจุบัน ลบด้วย คนที่มีปืนรวมทุกเลเวล)
+    total_with_gun = sum(gun_counts.values())
+    no_gun_count = max(0, current_members_count - total_with_gun)
     
-    # กล่องที่ 2 (กล่องล่าง): สรุปจำนวนปืน + เวลาอัปเดต
-    # 🟢 จัดรูปแบบตัวเลขให้ชิดขวา กว้าง 2 ช่อง (เลขหลักเดียวจะเว้นช่องว่างด้านหน้า 1 ช่องอัตโนมัติ)
+    # จัดรูปแบบตัวเลขชิดขวา 2 ช่อง เพื่อให้เส้นแนวตั้งตรงเป๊ะ
     c5 = f"{gun_counts['+5']:>2}"
     c4 = f"{gun_counts['+4']:>2}"
     c3 = f"{gun_counts['+3']:>2}"
     c2 = f"{gun_counts['+2']:>2}"
     c1 = f"{gun_counts['+1']:>2}"
     c0 = f"{gun_counts['+0']:>2}"
-
-    # กล่องที่ 2 (กล่องล่าง): สรุปจำนวนปืน + เวลาอัปเดต (เส้น │ จะตรงกันเป๊ะ)
+    c_no_gun = f"{no_gun_count:>2}"
+    
+    # กล่องที่ 1 (กล่องบน): หัวบอร์ด + สล็อต 01-30
+    part1 = f"⚔️ บอร์ดอัปเดตอาวุธแก๊ง Dark Monday ⚔️\n\n"
+    part1 += "\n".join(slots_text_lines)
+    
+    # กล่องที่ 2 (กล่องล่าง): สรุปจำนวนปืน + สมาชิกปัจจุบัน [ ... ] + ยังไม่มีปืน + เวลาอัปเดต
     part2 = (
-        f"📊 [ สรุปจำนวนปืนในแก๊ง ]\n\n"
+        f"📊 สรุปจำนวนปืนในแก๊ง [ สมาชิกปัจจุบัน: {current_members_count} คน ]\n\n"
         f"• ปืน +5: {c5} คน  │  ปืน +4: {c4} คน  │  ปืน +3: {c3} คน\n"
-        f"• ปืน +2: {c2} คน  │  ปืน +1: {c1} คน  │  ปืน +0: {c0} คน\n\n"
+        f"• ปืน +2: {c2} คน  │  ปืน +1: {c1} คน  │  ปืน +0: {c0} คน\n"
+        f"• ยังไม่มีปืน: {c_no_gun} คน\n\n"
         f"Update {now_str}"
     )
     
     return part1, part2
-
 
 # 🟢 [แก้ไข] ฟังก์ชันอัปเดตบอร์ด ค้นหาและแก้ไขข้อความทั้ง 2 กล่องเรียงตามลำดับ
 async def update_weapon_board(guild):
@@ -396,7 +401,7 @@ class AdminWeaponManageMainView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=view)
 
-    @discord.ui.button(label="➖ ลบรายชื่อออกจากสล็อต", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(label="➖ ลบรายชื่อจากสล็อต", style=discord.ButtonStyle.primary, row=0)
     async def remove_member_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
         view = AdminRemoveMemberSlotView(interaction.guild)
         if not view.children:
@@ -419,7 +424,7 @@ class AdminWeaponManageMainView(discord.ui.View):
         )
         await interaction.response.edit_message(content=text, view=view)
 
-    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=1)
+    @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, row=0)
     async def close_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.defer()
         try: await interaction.delete_original_response()
