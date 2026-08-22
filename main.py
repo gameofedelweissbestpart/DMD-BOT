@@ -147,14 +147,23 @@ def generate_weapon_board_content(guild):
     now_str = get_thai_time().strftime("%d/%m/%Y เวลา %H:%M น.")
     
     # กล่องที่ 1 (กล่องบน): หัวบอร์ด + สล็อต 01-30
-    part1 = f"⚔️ บอร์ดอัปเดตอาวุธแก๊ง Dark Monday ⚔️\n\n"
+    part1 = f"⚔️ บอร์ดอัปเดตอาวุธ ⚔️\n\n"
     part1 += "\n".join(slots_text_lines)
     
     # กล่องที่ 2 (กล่องล่าง): สรุปจำนวนปืน + เวลาอัปเดต
+    # 🟢 จัดรูปแบบตัวเลขให้ชิดขวา กว้าง 2 ช่อง (เลขหลักเดียวจะเว้นช่องว่างด้านหน้า 1 ช่องอัตโนมัติ)
+    c5 = f"{gun_counts['+5']:>2}"
+    c4 = f"{gun_counts['+4']:>2}"
+    c3 = f"{gun_counts['+3']:>2}"
+    c2 = f"{gun_counts['+2']:>2}"
+    c1 = f"{gun_counts['+1']:>2}"
+    c0 = f"{gun_counts['+0']:>2}"
+
+    # กล่องที่ 2 (กล่องล่าง): สรุปจำนวนปืน + เวลาอัปเดต (เส้น │ จะตรงกันเป๊ะ)
     part2 = (
         f"📊 [ สรุปจำนวนปืนในแก๊ง ]\n\n"
-        f"• ปืน +5: {gun_counts['+5']} คน  │  ปืน +4: {gun_counts['+4']} คน  │  ปืน +3: {gun_counts['+3']} คน\n"
-        f"• ปืน +2: {gun_counts['+2']} คน  │  ปืน +1: {gun_counts['+1']} คน  │  ปืน +0: {gun_counts['+0']} คน\n\n"
+        f"• ปืน +5: {c5} คน  │  ปืน +4: {c4} คน  │  ปืน +3: {c3} คน\n"
+        f"• ปืน +2: {c2} คน  │  ปืน +1: {c1} คน  │  ปืน +0: {c0} คน\n\n"
         f"Update {now_str}"
     )
     
@@ -826,17 +835,26 @@ class AdminRemoveMemberSlotView(discord.ui.View):
 # --- 🟢 ส่วนตั้งค่าห้อง: ปรับแก้ให้ใช้ update_weapon_board ส่ง 2 ข้อความถูกต้อง ---
 # --- 🟢 [แก้ไขจุดที่ 2] หน้าตั้งค่าระบบอัปเดตอาวุธ: เพิ่มปุ่มสลับสถานะ Log เปิด/ปิด ที่แถวปุ่มกดด้านล่าง (row=2) ---
 # --- 🟢 หน้าตั้งค่าระบบอัปเดตอาวุธ (สลับปุ่มบันทึกไว้หน้าสุด และสถานะ Log ไว้ตรงกลาง) ---
+# --- 🟢 หน้าตั้งค่าระบบอัปเดตอาวุธ (อิสระในการเลือกห้อง Log ไม่บังคับห้องบอร์ด + โหลดค่าเดิมอัตโนมัติ) ---
 class WeaponSetupView(discord.ui.View):
     def __init__(self, guild: discord.Guild):
         super().__init__(timeout=300)
-        self.board_ch_id = None
-        self.log_ch_id = "disabled"
-        self.log_enabled = True  # ตัวแปรควบคุมสถานะ Log (เริ่มต้นเปิดใช้งาน)
+        self.guild = guild
+        gid = str(guild.id)
+        cfg = load_data(gid, "config", {})
         
+        # 🟢 โหลดค่าเดิมจาก config มาเก็บไว้ (ถ้ามี) เพื่อไม่ให้ค่าเก่าหายเวลาไม่ได้เลือกซ้ำ
+        self.board_ch_id = cfg.get("weapon_board_ch")
+        existing_log = cfg.get("weapon_log_ch", "disabled")
+        self.log_ch_id = existing_log
+        
+        # 🟢 กำหนดสถานะ Log ตามค่าเดิมในระบบ
+        self.log_enabled = (existing_log != "disabled")
+
         self.board_select = discord.ui.Select(
             select_type=discord.ComponentType.channel_select,
             channel_types=[discord.ChannelType.text],
-            placeholder="📍 พิมพ์ค้นหาหรือเลือกห้องส่งบอร์ดอาวุธ...",
+            placeholder="📍 พิมพ์ค้นหาหรือเลือกห้องส่งบอร์ดอาวุธ (ไม่บังคับเปลี่ยน)...",
             row=0
         )
         self.board_select.callback = self.board_cb
@@ -851,6 +869,16 @@ class WeaponSetupView(discord.ui.View):
         self.log_select.callback = self.log_cb
         self.add_item(self.log_select)
 
+        # 🟢 ปรับป้ายชื่อและสีของปุ่มสถานะ Log ให้ตรงกับค่าที่บันทึกไว้ล่าสุด
+        for child in self.children:
+            if isinstance(child, discord.ui.Button) and "สถานะ Log" in child.label:
+                if not self.log_enabled:
+                    child.label = "📋 สถานะ Log: ปิดอยู่"
+                    child.style = discord.ButtonStyle.danger
+                else:
+                    child.label = "📋 สถานะ Log: เปิดอยู่"
+                    child.style = discord.ButtonStyle.success
+
     async def board_cb(self, interaction: discord.Interaction):
         self.board_ch_id = self.board_select.values[0].id
         await interaction.response.defer()
@@ -859,45 +887,45 @@ class WeaponSetupView(discord.ui.View):
         self.log_ch_id = self.log_select.values[0].id
         await interaction.response.defer()
 
-    # 🟢 1. ปุ่มบันทึกการตั้งค่า (ย้ายมาอยู่หน้าสุด / ซ้ายสุด)
+    # 1. ปุ่มบันทึกการตั้งค่า (ไม่บังคับว่าต้องเลือกห้องบอร์ดใหม่)
     @discord.ui.button(label="✅ บันทึกการตั้งค่า", style=discord.ButtonStyle.primary, row=2)
     async def save_config_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        if not self.board_ch_id:
-            msg = await interaction.followup.send("⚠️ กรุณาเลือกห้องสำหรับแสดงบอร์ดอาวุธก่อนครับ!", ephemeral=True)
-            await asyncio.sleep(5)
-            try: await msg.delete()
-            except: pass
-            return
-            
         gid = str(interaction.guild.id)
         cfg = load_data(gid, "config", {})
-        cfg["weapon_board_ch"] = str(self.board_ch_id)
         
+        # 🟢 ถ้ามีการเลือกห้องบอร์ดใหม่ให้อัปเดต ถ้าไม่ได้เลือกใช้ค่าเดิม
+        if self.board_ch_id:
+            cfg["weapon_board_ch"] = str(self.board_ch_id)
+        
+        # 🟢 บันทึกสถานะ Log
         if self.log_enabled:
-            cfg["weapon_log_ch"] = str(self.log_ch_id) if self.log_ch_id != "disabled" else "disabled"
+            if self.log_ch_id != "disabled":
+                cfg["weapon_log_ch"] = str(self.log_ch_id)
         else:
             cfg["weapon_log_ch"] = "disabled"
             
         save_data(gid, "config", cfg)
         
-        try:
-            await update_weapon_board(interaction.guild)
-        except Exception as e:
-            print(f"⚠️ Error sending weapon board: {e}")
+        # พยายามส่ง/อัปเดตบอร์ดเฉพาะเมื่อมีห้องบอร์ดตั้งไว้แล้ว
+        if cfg.get("weapon_board_ch"):
+            try:
+                await update_weapon_board(interaction.guild)
+            except Exception as e:
+                print(f"⚠️ Error sending weapon board: {e}")
 
         try: await interaction.delete_original_response()
         except: pass
         
-        board_ch_mention = f"<#{self.board_ch_id}>"
+        board_ch_mention = f"<#{cfg.get('weapon_board_ch')}>" if cfg.get('weapon_board_ch') else "`ยังไม่ได้ตั้งค่าห้องบอร์ด`"
         status_log_txt = "เปิดใช้งาน" if self.log_enabled else "ปิดใช้งาน"
-        success_msg = await interaction.followup.send(f"✅ **ตั้งค่าระบบอัปเดตอาวุธสำเร็จ!**\n📍 ส่งบอร์ดไปที่ห้อง: {board_ch_mention}\n📋 สถานะ Log: {status_log_txt}", ephemeral=True)
+        success_msg = await interaction.followup.send(f"✅ **ตั้งค่าระบบอัปเดตอาวุธสำเร็จ!**\n📍 ห้องบอร์ด: {board_ch_mention}\n📋 สถานะ Log: {status_log_txt}", ephemeral=True)
         await asyncio.sleep(10)
         try: await success_msg.delete()
         except: pass
 
-    # 🟢 2. ปุ่มสลับสถานะ Log (ย้ายมาอยู่ตรงกลาง)
+    # 2. ปุ่มสลับสถานะ Log (อยู่ตรงกลาง)
     @discord.ui.button(label="📋 สถานะ Log: เปิดอยู่", style=discord.ButtonStyle.success, row=2)
     async def toggle_log_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
         self.log_enabled = not self.log_enabled
@@ -909,7 +937,7 @@ class WeaponSetupView(discord.ui.View):
             button.style = discord.ButtonStyle.danger
         await interaction.response.edit_message(view=self)
 
-    # 3. ปุ่มยกเลิก (อยู่ขวาุดตามเดิม)
+    # 3. ปุ่มยกเลิก
     @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.danger, row=2)
     async def cancel_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.defer()
