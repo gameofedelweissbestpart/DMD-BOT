@@ -292,38 +292,43 @@ GUN_OPTIONS = [
 
 # --- 🟢 ส่วนที่ทำใหม่: หน้าต่างอัปเดตอาวุธ (Pre-load ข้อมูลเดิม + มีป้ายชื่อกำกับ) ---
 # --- 🟢 ส่วนที่ทำใหม่: หน้าต่างอัปเดตอาวุธ (Pre-load ข้อมูลเดิม + มีป้ายชื่อกำกับ) ---
+# --- 📌 หน้าต่างอัปเดตอาวุธของฉัน (จำค่าเดิม ไม่ให้ตัวที่ไม่ได้เลือกโดนรีเซ็ต) ---
 class WeaponUpdateView(discord.ui.View):
     def __init__(self, user_id: int, slot_info: dict):
         super().__init__(timeout=300)
         self.user_id = user_id
         
-        default_knife = slot_info.get("knife", "-")
-        default_machete = slot_info.get("machete", "-")
-        default_pool = slot_info.get("pool", "-")
-        default_gun = slot_info.get("gun", "-")
+        # 🟢 บันทึกค่าเดิมเก็บไว้ในตัวแปรของ View
+        self.knife_val = slot_info.get("knife", "-")
+        self.machete_val = slot_info.get("machete", "-")
+        self.pool_val = slot_info.get("pool", "-")
+        self.gun_val = slot_info.get("gun", "-")
         
-        # 🟢 [แก้ไข] ส่งตัวเลือกเฉพาะของอาวุธแต่ละชนิดเข้า Select
-        self.knife_select = self.create_gear_select("🔪 เลือกเลเวลมีด...", KNIFE_OPTIONS, default_knife, row=0)
-        self.machete_select = self.create_gear_select("🗡️ เลือกเลเวลมาเชเต้...", MACHETE_OPTIONS, default_machete, row=1)
-        self.pool_select = self.create_gear_select("🦯 เลือกเลเวลไม้พูล...", POOL_OPTIONS, default_pool, row=2)
-        self.gun_select = self.create_gear_select("🔫 เลือกเลเวลปืน...", GUN_OPTIONS, default_gun, row=3)
+        self.knife_select = self.create_gear_select("🔪 เลือกเลเวลมีด...", KNIFE_OPTIONS, self.knife_val, row=0, attr="knife_val")
+        self.machete_select = self.create_gear_select("🗡️ เลือกเลเวลมาเชเต้...", MACHETE_OPTIONS, self.machete_val, row=1, attr="machete_val")
+        self.pool_select = self.create_gear_select("🦯 เลือกเลเวลไม้พูล...", POOL_OPTIONS, self.pool_val, row=2, attr="pool_val")
+        self.gun_select = self.create_gear_select("🔫 เลือกเลเวลปืน...", GUN_OPTIONS, self.gun_val, row=3, attr="gun_val")
         
         self.add_item(self.knife_select)
         self.add_item(self.machete_select)
         self.add_item(self.pool_select)
         self.add_item(self.gun_select)
 
-    def create_gear_select(self, placeholder, options, default_val, row):
+    def create_gear_select(self, placeholder, options, default_val, row, attr):
         opts = [discord.SelectOption(label=opt.label, value=opt.value, default=(opt.value == default_val)) for opt in options]
         sel = discord.ui.Select(placeholder=placeholder, options=opts, row=row)
-        async def dummy_cb(interaction: discord.Interaction):
+        
+        # 🟢 บันทึกค่าทันทีเมื่อผู้ใช้เลือกเปลี่ยนใน Dropdown นั้นๆ
+        async def select_cb(interaction: discord.Interaction):
+            if sel.values:
+                setattr(self, attr, sel.values[0])
             await interaction.response.defer()
-        sel.callback = dummy_cb
+            
+        sel.callback = select_cb
         return sel
 
     @discord.ui.button(label="✅ ยืนยันการอัปเดต", style=discord.ButtonStyle.success, row=4)
     async def confirm_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # 🟢 [แก้ไข] ย้าย defer ขึ้นมาบรรทัดแรกสุด ป้องกัน Timeout 3 วินาที
         await interaction.response.defer(ephemeral=True)
         gid = str(interaction.guild.id)
         weapons_data = load_weapons(gid)
@@ -341,15 +346,15 @@ class WeaponUpdateView(discord.ui.View):
             except: pass
             return
             
-        knife_val = self.knife_select.values[0] if self.knife_select.values else "-"
-        machete_val = self.machete_select.values[0] if self.machete_select.values else "-"
-        pool_val = self.pool_select.values[0] if self.pool_select.values else "-"
-        gun_val = self.gun_select.values[0] if self.gun_select.values else "-"
-        
-        weapons_data[target_slot].update({"knife": knife_val, "machete": machete_val, "pool": pool_val, "gun": gun_val})
+        # 🟢 ใช้ค่าที่จำไว้ใน View (อันไหนไม่ได้เปลี่ยน จะใช้ค่าเดิมอันเก่า)
+        weapons_data[target_slot].update({
+            "knife": self.knife_val, 
+            "machete": self.machete_val, 
+            "pool": self.pool_val, 
+            "gun": self.gun_val
+        })
         save_weapons(gid, weapons_data)
         
-        # 🟢 [แก้ไข] ครอบ try-except ล้อมการอัปเดตบอร์ด เพื่อความเสถียร
         try:
             await update_weapon_board(interaction.guild)
         except Exception as e:
@@ -363,7 +368,7 @@ class WeaponUpdateView(discord.ui.View):
                 if log_ch:
                     log_em = discord.Embed(title="📌 บันทึกการอัปเดตเลเวลอาวุธ", color=0x3498db)
                     log_em.description = (f"**👤 สมาชิก:** {interaction.user.display_name} (สล็อตที่ {target_slot})\n"
-                                          f"• มีด: `{knife_val}` | มาเชเต้: `{machete_val}` | ไม้พูล: `{pool_val}` | ปืน: `{gun_val}`\n\n{LONG_SEP}")
+                                          f"• มีด: `{self.knife_val}` | มาเชเต้: `{self.machete_val}` | ไม้พูล: `{self.pool_val}` | ปืน: `{self.gun_val}`\n\n{LONG_SEP}")
                     log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
                     await log_ch.send(embed=log_em)
             except: pass
@@ -504,6 +509,7 @@ class AdminSelectSlotForUpdateView(discord.ui.View):
 
 
 # --- 🟢 [เพิ่มใหม่] หน้าต่างปรับเลเวลอาวุธสำหรับแอดมิน (อัปเดตแทน) ---
+# --- 📌 หน้าต่างปรับเลเวลอาวุธสำหรับแอดมิน (จำค่าเดิม ไม่ให้ตัวที่ไม่ได้เลือกโดนรีเซ็ต) ---
 # --- 📌 หน้าต่างปรับเลเวลอาวุธสำหรับแอดมิน (จำค่าเดิม ไม่ให้ตัวที่ไม่ได้เลือกโดนรีเซ็ต) ---
 class AdminWeaponUpdateView(discord.ui.View):
     def __init__(self, target_user_id: int, target_slot: str, slot_info: dict):
