@@ -293,16 +293,22 @@ GUN_OPTIONS = [
 # --- 🟢 ส่วนที่ทำใหม่: หน้าต่างอัปเดตอาวุธ (Pre-load ข้อมูลเดิม + มีป้ายชื่อกำกับ) ---
 # --- 🟢 ส่วนที่ทำใหม่: หน้าต่างอัปเดตอาวุธ (Pre-load ข้อมูลเดิม + มีป้ายชื่อกำกับ) ---
 # --- 📌 หน้าต่างอัปเดตอาวุธของฉัน (จำค่าเดิม ไม่ให้ตัวที่ไม่ได้เลือกโดนรีเซ็ต) ---
+# --- 📌 หน้าต่างอัปเดตอาวุธของฉัน (พร้อมระบบ Log เปรียบเทียบเก่า/ใหม่) ---
 class WeaponUpdateView(discord.ui.View):
     def __init__(self, user_id: int, slot_info: dict):
         super().__init__(timeout=300)
         self.user_id = user_id
         
-        # 🟢 บันทึกค่าเดิมเก็บไว้ในตัวแปรของ View
-        self.knife_val = slot_info.get("knife", "-")
-        self.machete_val = slot_info.get("machete", "-")
-        self.pool_val = slot_info.get("pool", "-")
-        self.gun_val = slot_info.get("gun", "-")
+        # 🟢 บันทึกค่าเดิม (Old) ไว้เทียบกับค่าใหม่
+        self.old_knife = slot_info.get("knife", "-")
+        self.old_machete = slot_info.get("machete", "-")
+        self.old_pool = slot_info.get("pool", "-")
+        self.old_gun = slot_info.get("gun", "-")
+        
+        self.knife_val = self.old_knife
+        self.machete_val = self.old_machete
+        self.pool_val = self.old_pool
+        self.gun_val = self.old_gun
         
         self.knife_select = self.create_gear_select("🔪 เลือกเลเวลมีด...", KNIFE_OPTIONS, self.knife_val, row=0, attr="knife_val")
         self.machete_select = self.create_gear_select("🗡️ เลือกเลเวลมาเชเต้...", MACHETE_OPTIONS, self.machete_val, row=1, attr="machete_val")
@@ -318,7 +324,6 @@ class WeaponUpdateView(discord.ui.View):
         opts = [discord.SelectOption(label=opt.label, value=opt.value, default=(opt.value == default_val)) for opt in options]
         sel = discord.ui.Select(placeholder=placeholder, options=opts, row=row)
         
-        # 🟢 บันทึกค่าทันทีเมื่อผู้ใช้เลือกเปลี่ยนใน Dropdown นั้นๆ
         async def select_cb(interaction: discord.Interaction):
             if sel.values:
                 setattr(self, attr, sel.values[0])
@@ -346,7 +351,6 @@ class WeaponUpdateView(discord.ui.View):
             except: pass
             return
             
-        # 🟢 ใช้ค่าที่จำไว้ใน View (อันไหนไม่ได้เปลี่ยน จะใช้ค่าเดิมอันเก่า)
         weapons_data[target_slot].update({
             "knife": self.knife_val, 
             "machete": self.machete_val, 
@@ -366,9 +370,22 @@ class WeaponUpdateView(discord.ui.View):
             try:
                 log_ch = bot.get_channel(int(log_ch_id))
                 if log_ch:
+                    # 🟢 จัดรูปแบบ Log เปรียบเทียบเก่า/ใหม่ตามรูปแบบที่คุณต้องการ
+                    knife_log = f"{self.old_knife} ➔ {self.knife_val}" if self.old_knife != self.knife_val else f"{self.knife_val} (คงเดิม)"
+                    machete_log = f"{self.old_machete} ➔ {self.machete_val}" if self.old_machete != self.machete_val else f"{self.machete_val} (คงเดิม)"
+                    pool_log = f"{self.old_pool} ➔ {self.pool_val}" if self.old_pool != self.pool_val else f"{self.pool_val} (คงเดิม)"
+                    gun_log = f"{self.old_gun} ➔ {self.gun_val}" if self.old_gun != self.gun_val else f"{self.gun_val} (คงเดิม)"
+
                     log_em = discord.Embed(title="📌 บันทึกการอัปเดตเลเวลอาวุธ", color=0x3498db)
-                    log_em.description = (f"**👤 สมาชิก:** {interaction.user.display_name} (สล็อตที่ {target_slot})\n"
-                                          f"• มีด: `{self.knife_val}` | มาเชเต้: `{self.machete_val}` | ไม้พูล: `{self.pool_val}` | ปืน: `{self.gun_val}`\n\n{LONG_SEP}")
+                    log_em.description = (
+                        f"**👤 สมาชิก:** {interaction.user.display_name} (สล็อตที่ {target_slot})\n\n"
+                        f"🔄 **รายละเอียดการเปลี่ยนแปลง:**\n"
+                        f"• มีด: {knife_log}\n"
+                        f"• มาเชเต้: {machete_log}\n"
+                        f"• ไม้พูล: {pool_log}\n"
+                        f"• ปืน: {gun_log}\n\n"
+                        f"{LONG_SEP}"
+                    )
                     log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
                     await log_ch.send(embed=log_em)
             except: pass
@@ -511,17 +528,23 @@ class AdminSelectSlotForUpdateView(discord.ui.View):
 # --- 🟢 [เพิ่มใหม่] หน้าต่างปรับเลเวลอาวุธสำหรับแอดมิน (อัปเดตแทน) ---
 # --- 📌 หน้าต่างปรับเลเวลอาวุธสำหรับแอดมิน (จำค่าเดิม ไม่ให้ตัวที่ไม่ได้เลือกโดนรีเซ็ต) ---
 # --- 📌 หน้าต่างปรับเลเวลอาวุธสำหรับแอดมิน (จำค่าเดิม ไม่ให้ตัวที่ไม่ได้เลือกโดนรีเซ็ต) ---
+# --- 📌 หน้าต่างปรับเลเวลอาวุธสำหรับแอดมิน (พร้อมระบบ Log เปรียบเทียบเก่า/ใหม่) ---
 class AdminWeaponUpdateView(discord.ui.View):
     def __init__(self, target_user_id: int, target_slot: str, slot_info: dict):
         super().__init__(timeout=300)
         self.target_user_id = target_user_id
         self.target_slot = target_slot
         
-        # 🟢 บันทึกค่าเดิมเก็บไว้ในตัวแปรของ View เช่นเดียวกัน
-        self.knife_val = slot_info.get("knife", "-")
-        self.machete_val = slot_info.get("machete", "-")
-        self.pool_val = slot_info.get("pool", "-")
-        self.gun_val = slot_info.get("gun", "-")
+        # 🟢 บันทึกค่าเดิม (Old) ไว้เทียบกับค่าใหม่
+        self.old_knife = slot_info.get("knife", "-")
+        self.old_machete = slot_info.get("machete", "-")
+        self.old_pool = slot_info.get("pool", "-")
+        self.old_gun = slot_info.get("gun", "-")
+        
+        self.knife_val = self.old_knife
+        self.machete_val = self.old_machete
+        self.pool_val = self.old_pool
+        self.gun_val = self.old_gun
         
         self.knife_select = self.create_gear_select("🔪 เลือกเลเวลมีด...", KNIFE_OPTIONS, self.knife_val, row=0, attr="knife_val")
         self.machete_select = self.create_gear_select("🗡️ เลือกเลเวลมาเชเต้...", MACHETE_OPTIONS, self.machete_val, row=1, attr="machete_val")
@@ -558,7 +581,6 @@ class AdminWeaponUpdateView(discord.ui.View):
             except: pass
             return
             
-        # 🟢 ใช้ค่าที่จำไว้ใน View
         weapons_data[self.target_slot].update({
             "knife": self.knife_val, 
             "machete": self.machete_val, 
@@ -580,10 +602,24 @@ class AdminWeaponUpdateView(discord.ui.View):
                 if log_ch:
                     target_member = interaction.guild.get_member(self.target_user_id)
                     target_name = target_member.display_name if target_member else f"ID: {self.target_user_id}"
+                    
+                    # 🟢 จัดรูปแบบ Log เปรียบเทียบเก่า/ใหม่ สำหรับแอดมิน
+                    knife_log = f"{self.old_knife} ➔ {self.knife_val}" if self.old_knife != self.knife_val else f"{self.knife_val} (คงเดิม)"
+                    machete_log = f"{self.old_machete} ➔ {self.machete_val}" if self.old_machete != self.machete_val else f"{self.machete_val} (คงเดิม)"
+                    pool_log = f"{self.old_pool} ➔ {self.pool_val}" if self.old_pool != self.pool_val else f"{self.pool_val} (คงเดิม)"
+                    gun_log = f"{self.old_gun} ➔ {self.gun_val}" if self.old_gun != self.gun_val else f"{self.gun_val} (คงเดิม)"
+
                     log_em = discord.Embed(title="📌 บันทึกการอัปเดตเลเวลอาวุธ (โดยแอดมินแทน)", color=0xe67e22)
-                    log_em.description = (f"**👮 ผู้ดำเนินการ:** {interaction.user.display_name} (Admin)\n"
-                                          f"**👤 สมาชิก:** {target_name} (สล็อตที่ {self.target_slot})\n"
-                                          f"• มีด: `{self.knife_val}` | มาเชเต้: `{self.machete_val}` | ไม้พูล: `{self.pool_val}` | ปืน: `{self.gun_val}`\n\n{LONG_SEP}")
+                    log_em.description = (
+                        f"**👮 ผู้ดำเนินการ:** {interaction.user.display_name} (Admin)\n"
+                        f"**👤 สมาชิก:** {target_name} (สล็อตที่ {self.target_slot})\n\n"
+                        f"🔄 **รายละเอียดการเปลี่ยนแปลง:**\n"
+                        f"• มีด: {knife_log}\n"
+                        f"• มาเชเต้: {machete_log}\n"
+                        f"• ไม้พูล: {pool_log}\n"
+                        f"• ปืน: {gun_log}\n\n"
+                        f"{LONG_SEP}"
+                    )
                     log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
                     await log_ch.send(embed=log_em)
             except: pass
