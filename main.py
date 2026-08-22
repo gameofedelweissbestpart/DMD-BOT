@@ -107,6 +107,7 @@ def save_weapons(guild_id, data):
     save_data(guild_id, "weapons", data)
 
 # --- 📌 ของเดิม / ส่วนที่ปรับปรุง: ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ ---
+# 📌 แก้ไขฟังก์ชัน generate_weapon_board_content (ช่วงบรรทัดที่ 62)
 def generate_weapon_board_content(guild):
     gid = str(guild.id)
     weapons_data = load_weapons(gid)
@@ -115,16 +116,15 @@ def generate_weapon_board_content(guild):
     slots_text_lines = []
     
     for i in range(1, 31):
-        slot_key = f"{i:02d}"  # เปลี่ยนจาก str(i) เป็น f"{i:02d}"
+        slot_key = f"{i:02d}"
+        slot_num_str = f"{i:02d}"  # 🟢 [เพิ่มบรรทัดนี้] ประกาศตัวแปร slot_num_str ให้ทำงานได้
         slot_info = weapons_data.get(slot_key)
         
         if slot_info and slot_info.get("user_id"):
             raw_name = slot_info.get("name", "Unknown")
-            # --- 🟢 ส่วนที่ทำใหม่: Regex ตัดเลข/จุดนำหน้าชื่อออก ---
             name = re.sub(r'^[\d\.\s]+', '', raw_name).strip()
             if not name: name = raw_name
             
-            # --- 🟢 ส่วนที่ทำใหม่: ขยายความกว้างชื่อเป็น 30 ตัวอักษร ---
             name_display = name[:30].ljust(30)
             
             knife = slot_info.get("knife", "-")
@@ -1569,6 +1569,7 @@ class AdminCatSelect(discord.ui.Select):
 
 
 # --- ส่วนที่ 1: หน้าเลือกเลือกระบบ (ลา หรือ ปรับเงิน) ---
+# 🟢 2. แก้ไขในคลาส CategorySelectionView (เปลี่ยนเป็น send_message + ephemeral=True)
 class CategorySelectionView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -1582,7 +1583,8 @@ class CategorySelectionView(discord.ui.View):
             discord.SelectOption(label="📊 ประวัติรายวัน", value="daily_ch"),
             discord.SelectOption(label="📊 สรุปประวัติรายสัปดาห์", value="weekly_ch"),
         ]
-        await interaction.response.edit_message(content="🛠 **ระบบแจ้งลา:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)))
+        # 🟢 [แก้ไข] เปลี่ยนจาก edit_message เป็น send_message แบบ ephemeral=True
+        await interaction.response.send_message(content="🛠 **ระบบแจ้งลา:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)), ephemeral=True)
 
     @discord.ui.button(label="💰 ระบบแจ้งปรับเงิน", style=discord.ButtonStyle.primary, custom_id="setup_fine_system")
     async def fine_system_setup(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -1591,7 +1593,8 @@ class CategorySelectionView(discord.ui.View):
             discord.SelectOption(label="📌 Log การปรับเงิน", value="fine_log_ch"),
             discord.SelectOption(label="✅ อนุมัติการชำระเงิน", value="fine_approve_ch"),
         ]
-        await interaction.response.edit_message(content="🛠 **ระบบแจ้งปรับเงิน:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)))
+        # 🟢 [แก้ไข] เปลี่ยนจาก edit_message เป็น send_message แบบ ephemeral=True
+        await interaction.response.send_message(content="🛠 **ระบบแจ้งปรับเงิน:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)), ephemeral=True)
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, custom_id="admin_close_setup_category")
     async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -1602,20 +1605,23 @@ class CategorySelectionView(discord.ui.View):
             pass
 
 # --- ⚙️ ส่วนที่ทำใหม่ / ปรับปรุง: Admin Panel หลัก ---
+# 🟢 1. แก้ไขในคลาส AdminPanelView (เปลี่ยนเป็น send_message + ephemeral=True)
 class AdminPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    # --- 📌 ของเดิม: ปุ่มแถวที่ 0 (ตั้งค่าห้อง, ระบบลา, ระบบสุ่ม) ---
     @discord.ui.button(label="📍 ตั้งค่าห้องต่างๆ", style=discord.ButtonStyle.primary, custom_id="admin_panel_set_l_btn", row=0)
     async def set_l(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await interaction.response.edit_message(content="📂 **เลือกหมวดหมู่ที่ต้องการจัดการ:**", view=CategorySelectionView())
+        # 🟢 [แก้ไข] เปลี่ยนจาก edit_message เป็น send_message แบบ ephemeral=True
+        await interaction.response.send_message(content="📂 **เลือกหมวดหมู่ที่ต้องการจัดการ:**", view=CategorySelectionView(), ephemeral=True)
 
     @discord.ui.button(label="📝 ระบบลา", style=discord.ButtonStyle.primary, custom_id="admin_panel_leave_sys_btn", row=0)
     async def leave_system(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await interaction.response.edit_message(
+        # 🟢 [แก้ไข] เปลี่ยนจาก edit_message เป็น send_message แบบ ephemeral=True
+        await interaction.response.send_message(
             content="📑 **เมนูจัดการระบบลา:** เลือกการดำเนินการที่ต้องการ", 
-            view=AdminLeaveManagementView()
+            view=AdminLeaveManagementView(),
+            ephemeral=True
         )
 
     @discord.ui.button(label="🎲 ระบบสุ่มรายชื่อ", style=discord.ButtonStyle.primary, custom_id="admin_panel_random_sys_btn", row=0)
@@ -1630,13 +1636,14 @@ class AdminPanelView(discord.ui.View):
             "🎲 **__เมนูเลือกรูปแบบการสุ่มรายชื่อ__**\n"
             "กรุณาเลือกรูปแบบการสุ่มที่ต้องการใช้งานด้านล่างครับ:"
         )
-        await interaction.response.edit_message(content=text, view=view)
+        # 🟢 [แก้ไข] เปลี่ยนจาก edit_message เป็น send_message แบบ ephemeral=True
+        await interaction.response.send_message(content=text, view=view, ephemeral=True)
 
-    # --- 🟢 ส่วนที่ทำใหม่: เพิ่มปุ่มระบบอื่นๆ ไว้ที่แถวที่ 1 ---
     @discord.ui.button(label="🧩 ระบบอื่นๆ", style=discord.ButtonStyle.primary, custom_id="admin_panel_others_sys_btn", row=1)
     async def others_system(self, button: discord.ui.Button, interaction: discord.Interaction):
         view = OthersSystemView()
-        await interaction.response.edit_message(content="🧩 **เมนูจัดการระบบอื่นๆ ของแก๊ง:**", view=view)
+        # 🟢 [แก้ไข] เปลี่ยนจาก edit_message เป็น send_message แบบ ephemeral=True
+        await interaction.response.send_message(content="🧩 **เมนูจัดการระบบอื่นๆ ของแก๊ง:**", view=view, ephemeral=True)
 
 # ==========================================
 # 2. นำคลาส OthersSystemView มาวางต่อท้ายตรงนี้ (อยู่นอกคลาส AdminPanelView แล้ว)
