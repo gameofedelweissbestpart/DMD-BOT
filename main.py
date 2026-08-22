@@ -3458,4 +3458,4 @@ async def on_ready():
 if __name__ == "__main__":
     if not TOKEN:
         raise ValueError("❌ ไม่พบ DISCORD_TOKEN ใน Environment Variables กรุณาตั้งค่าก่อนรันบอท")
-    bot.run(TOKEN)]
+    bot.run(TOKEN)
