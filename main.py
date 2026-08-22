@@ -3362,6 +3362,81 @@ async def random_slash_cmd(ctx: discord.ApplicationContext):
     await ctx.respond(content=text, view=view, ephemeral=True)
 
 
+# --- 🧪 คำสั่งทดสอบบอร์ดอาวุธแบบ Embed (แยกเฉพาะกิจเพื่อการทดสบ) ---
+@bot.command()
+async def board(ctx):
+    gid = str(ctx.guild.id)
+    weapons_data = load_weapons(gid)
+    
+    slots_text_lines = []
+    gun_counts = {"+5": 0, "+4": 0, "+3": 0, "+2": 0, "+1": 0, "+0": 0}
+    current_members_count = 0
+    
+    # 🛡️ หัวข้อหัวคอลัมน์ "เกราะนาโน" วางไว้แถวบนสุด (จัดช่องไฟไม่ให้ทับช่องปืน)
+    header_line = "                                                             เกราะนาโน"
+    slots_text_lines.append(header_line)
+    
+    for i in range(1, 31):
+        slot_key = f"{i:02d}"
+        slot_num_str = f"{i:02d}"
+        slot_info = weapons_data.get(slot_key)
+        
+        if slot_info and slot_info.get("user_id"):
+            current_members_count += 1
+            raw_name = slot_info.get("name", "Unknown")
+            name = re.sub(r'^[\d\.\s]+', '', raw_name).strip()
+            if not name: name = raw_name
+            
+            name_display = name[:24].ljust(24)
+            
+            knife = slot_info.get("knife", "-")
+            machete = slot_info.get("machete", "-")
+            pool = slot_info.get("pool", "-")
+            gun = slot_info.get("gun", "-")
+            
+            # โหลดสถานะเกราะนาโน (ถ้ายังไม่มีในเซฟเก่า ให้ถือว่าไม่มี 'no')
+            nano = slot_info.get("nano", "no")
+            nano_display = "✅ มี " if nano == "yes" else "❎ ไม่มี"
+            
+            if gun in gun_counts:
+                gun_counts[gun] += 1
+                
+            line = f"{slot_num_str}. {name_display}    มีด {knife:<2} │ มาเช {machete:<2} │ ไม้ {pool:<2} │ ปืน {gun:<2} │ {nano_display}"
+        else:
+            line = f"{slot_num_str}."
+        slots_text_lines.append(line)
+        
+    now_str = get_thai_time().strftime("%d/%m/%Y เวลา %H:%M น.")
+    
+    total_with_gun = sum(gun_counts.values())
+    no_gun_count = max(0, current_members_count - total_with_gun)
+    
+    c5 = f"{gun_counts['+5']:>2}"
+    c4 = f"{gun_counts['+4']:>2}"
+    c3 = f"{gun_counts['+3']:>2}"
+    c2 = f"{gun_counts['+2']:>2}"
+    c1 = f"{gun_counts['+1']:>2}"
+    c0 = f"{gun_counts['+0']:>2}"
+    c_no_gun = f"{no_gun_count:>2}"
+    
+    # 📌 ประกอบร่างส่วนตารางและส่วนสรุปยอดปืน
+    board_body = "\n".join(slots_text_lines)
+    summary_body = (
+        f"📊 สรุปจำนวนปืนในแก๊ง [ สมาชิกปัจจุบัน: {current_members_count} คน ]\n\n"
+        f"• ปืน +5: {c5} คน  │  ปืน +4: {c4} คน  │  ปืน +3: {c3} คน\n"
+        f"• ปืน +2: {c2} คน  │  ปืน +1: {c1} คน  │  ปืน +0: {c0} คน\n"
+        f"• ไม่มีปืน: {c_no_gun} คน\n\n"
+        f"Update {now_str}"
+    )
+    
+    # ครอบด้วย Code Block เดียวจบใน Embed
+    full_code_content = f"```text\n{board_body}\n\n{summary_body}\n```"
+    
+    embed = discord.Embed(color=0x3498db)
+    embed.description = f"# ⚔️ บอร์ดอัปเดตอาวุธแก๊ง Dark Monday\n\n{full_code_content}"
+    
+    await ctx.send(embed=embed)
+
 # --- ย้าย on_ready มาไว้ท้ายสุด และใส่ add_view ให้ครบ ---
 @bot.event
 async def on_ready():
@@ -3383,4 +3458,4 @@ async def on_ready():
 if __name__ == "__main__":
     if not TOKEN:
         raise ValueError("❌ ไม่พบ DISCORD_TOKEN ใน Environment Variables กรุณาตั้งค่าก่อนรันบอท")
-    bot.run(TOKEN)
+    bot.run(TOKEN)]v'
