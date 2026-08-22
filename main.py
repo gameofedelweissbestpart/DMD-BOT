@@ -115,9 +115,8 @@ def generate_weapon_board_content(guild):
     slots_text_lines = []
     
     for i in range(1, 31):
-        slot_key = str(i)
+        slot_key = f"{i:02d}"  # เปลี่ยนจาก str(i) เป็น f"{i:02d}"
         slot_info = weapons_data.get(slot_key)
-        slot_num_str = f"{i:02d}"
         
         if slot_info and slot_info.get("user_id"):
             raw_name = slot_info.get("name", "Unknown")
@@ -486,7 +485,7 @@ class AdminRemoveMemberSlotView(discord.ui.View):
         
         options = []
         for i in range(1, 31):
-            s_key = str(i)
+            s_key = f"{i:02d}"  # เปลี่ยนจาก str(i) เป็น f"{i:02d}"
             if s_key in weapons_data and weapons_data[s_key].get("user_id"):
                 raw_name = weapons_data[s_key].get("name", "Unknown")
                 clean_name = re.sub(r'^[\d\.\s]+', '', raw_name).strip()
@@ -1634,7 +1633,7 @@ class AdminPanelView(discord.ui.View):
         await interaction.response.edit_message(content=text, view=view)
 
     # --- 🟢 ส่วนที่ทำใหม่: เพิ่มปุ่มระบบอื่นๆ ไว้ที่แถวที่ 1 ---
-    @discord.ui.button(label="🧩 ระบบอื่นๆ", style=discord.ButtonStyle.danger, custom_id="admin_panel_others_sys_btn", row=1)
+    @discord.ui.button(label="🧩 ระบบอื่นๆ", style=discord.ButtonStyle.primary, custom_id="admin_panel_others_sys_btn", row=1)
     async def others_system(self, button: discord.ui.Button, interaction: discord.Interaction):
         view = OthersSystemView()
         await interaction.response.edit_message(content="🧩 **เมนูจัดการระบบอื่นๆ ของแก๊ง:**", view=view)
@@ -2044,20 +2043,17 @@ class AdminActionSelect(discord.ui.Select):
         super().__init__(placeholder=placeholder_str, options=opts)
     
     async def callback(self, it: discord.Interaction):
-        # --- เริ่มการแก้ไข Logic แยกไฟล์ตาม Guild ---
         gid = str(it.guild.id)
-        
         idx = int(self.values[0])
-        # โหลดข้อมูลใบลาเฉพาะของ Guild นี้
         d = load_data(gid, "leaves", []) 
-        
+    
         if 0 <= idx < len(d):
             od = d[idx]
-            # คงคำพูดและรูปแบบเดิมของคุณไว้ทั้งหมด
+            cat_display = format_categories(od.get('leave_category', 'ทั่วไป'))  # ครอบ format_categories
             em = discord.Embed(title="⚙️ เมนูจัดการสำหรับผู้ดูแล", color=0xe67e22)
             em.description = (f"**👤 สมาชิก:** <@{od['target_id']}>\n"
                               f"**📅 วันที่:** {od['start_date']} - {od['end_date']}\n"
-                              f"**📝 ประเภท:** {od.get('leave_category','ทั่วไป')}\n"
+                              f"**📝 ประเภท:** {cat_display}\n"  # นำ cat_display มาแสดง
                               f"**💬 เหตุผล:** {od['reason']}")
             
             # ส่งเมนูทางเลือกถัดไป (แก้ไข/ยกเลิก)
@@ -2678,6 +2674,7 @@ class EditDateSelect(discord.ui.Select):
             f"**📊 การเปลี่ยนแปลง:** `{diff_txt}`\n\n"
             f"**ยืนยันการแก้ไขข้อมูลหรือไม่?**"
         )
+        # เปลี่ยนบรรทัดสุดท้ายจาก interaction เป็น it
         await it.response.edit_message(content=None, embed=em, view=ConfirmEditView(self.idx, self.od, val))
 
 class EditLeaveSelect(discord.ui.Select):
@@ -2997,7 +2994,6 @@ async def on_ready():
     bot.add_view(AdminLeaveManagementView())    # ระบบลา/จัดการใบลา
     bot.add_view(ConfirmClearView())            # หน้ากดยืนยัน Cleanup 120 วัน
     bot.add_view(WeaponBoardPersistentView())   # ระบบบอร์ดอาวุธ
-    bot.add_view(OthersSystemView())            # ระบบอื่นๆ
     
     print(f'✅ {bot.user.name} ออนไลน์เรียบร้อย | ระบบปี 2026 พร้อมใช้งาน')
     if not daily_report_task.is_running(): daily_report_task.start()
