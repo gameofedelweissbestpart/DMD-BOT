@@ -108,6 +108,7 @@ def save_weapons(guild_id, data):
 
 # --- 📌 ของเดิม / ส่วนที่ปรับปรุง: ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ ---
 # --- 📌 แก้ไขฟังก์ชัน generate_weapon_board_content ---
+# 🟢 [แก้ไข] ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ (ปรับชื่อ 28 ตัวอักษร + ตัดหัวกล่องล่างออก)
 def generate_weapon_board_content(guild):
     gid = str(guild.id)
     weapons_data = load_weapons(gid)
@@ -125,8 +126,8 @@ def generate_weapon_board_content(guild):
             name = re.sub(r'^[\d\.\s]+', '', raw_name).strip()
             if not name: name = raw_name
             
-            # 🟢 [แก้ไข] ปรับระยะชื่อเป็น 22 ตัวอักษร เพื่อย่อขนาดข้อความรวมไม่ให้เกิน 2000 ตัวอักษร
-            name_display = name[:22].ljust(22)
+            # 🟢 [แก้ไข] ปรับระยะชื่อเป็น 28 ตัวอักษร
+            name_display = name[:28].ljust(28)
             
             knife = slot_info.get("knife", "-")
             machete = slot_info.get("machete", "-")
@@ -143,17 +144,24 @@ def generate_weapon_board_content(guild):
         
     now_str = get_thai_time().strftime("%d/%m/%Y เวลา %H:%M น.")
     
-    content = (
+    # 🟢 [แก้ไข] ข้อความกล่องบน (หัวบอร์ด + สรุปจำนวนปืน + สล็อต 01-15)
+    part1 = (
         f"⚔️ บอร์ดอัปเดตอาวุธแก๊ง Dark Monday ⚔️\n\n"
-        f"📊 สรุปจำนวนปืน\n"
+        f"📊 [ สรุปจำนวนปืนในแก๊ง ]\n"
         f"• ปืน +5: {gun_counts['+5']} คน  │  ปืน +4: {gun_counts['+4']} คน  │  ปืน +3: {gun_counts['+3']} คน\n"
         f"• ปืน +2: {gun_counts['+2']} คน  │  ปืน +1: {gun_counts['+1']} คน  │  ปืน +0: {gun_counts['+0']} คน\n"
         f"------------------------------------------------------------------------------------\n\n"
     )
-    content += "\n".join(slots_text_lines)
-    content += f"\n\nUpdate {now_str}"
-    return content
+    part1 += "\n".join(slots_text_lines[:15])
+    
+    # 🟢 [แก้ไข] ข้อความกล่องล่าง (ไม่มีหัวข้อ ชิดขอบบน เริ่มที่สล็อต 16-30 + เวลาอัปเดต)
+    part2 = "\n".join(slots_text_lines[15:])
+    part2 += f"\n\nUpdate {now_str}"
+    
+    return part1, part2
 
+
+# 🟢 [แก้ไข] ฟังก์ชันอัปเดตบอร์ด ค้นหาและแก้ไขข้อความทั้ง 2 กล่องเรียงตามลำดับ
 async def update_weapon_board(guild):
     gid = str(guild.id)
     cfg = load_data(gid, "config", {})
@@ -163,18 +171,28 @@ async def update_weapon_board(guild):
     channel = guild.get_channel(int(ch_id))
     if not channel: return
         
-    board_text = generate_weapon_board_content(guild)
-    code_block = f"```text\n{board_text}\n```"
+    part1_text, part2_text = generate_weapon_board_content(guild)
+    code_block1 = f"```text\n{part1_text}\n```"
+    code_block2 = f"```text\n{part2_text}\n```"
     
-    target = None
-    async for m in channel.history(limit=50):
-        if m.author == bot.user and m.content and "บอร์ดอัปเดตอาวุธแก๊ง Dark Monday" in m.content:
-            target = m
-            break
-            
+    bot_msgs = []
+    # 🟢 [แก้ไข] ค้นหาข้อความเดิมของบอทในช่องจากเก่าไปใหม่
+    async for m in channel.history(limit=20, oldest_first=True):
+        if m.author == bot.user and m.content and ("บอร์ดอัปเดตอาวุธแก๊ง Dark Monday" in m.content or "Update " in m.content):
+            bot_msgs.append(m)
+
     view = WeaponBoardPersistentView()
-    if target: await target.edit(content=code_block, view=view)
-    else: await channel.send(content=code_block, view=view)
+    
+    # 🟢 [แก้ไข] อัปเดตข้อความกล่องบนและล่างตามลำดับ
+    if len(bot_msgs) >= 2:
+        await bot_msgs[0].edit(content=code_block1, view=None)
+        await bot_msgs[1].edit(content=code_block2, view=view)
+    else:
+        for m in bot_msgs:
+            try: await m.delete()
+            except: pass
+        await channel.send(content=code_block1)
+        await channel.send(content=code_block2, view=view)
 
 class WeaponBoardPersistentView(discord.ui.View):
     def __init__(self):
