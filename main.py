@@ -216,16 +216,48 @@ class WeaponBoardPersistentView(discord.ui.View):
         view = AdminWeaponManageMainView()
         await interaction.response.send_message("⚙️ **เลือกรายการที่ต้องการจัดการสล็อตอาวุธ:**", view=view, ephemeral=True)
 
-GEAR_OPTIONS = [
-    discord.SelectOption(label="❌ ไม่มีอาวุธ", value="-"),
-    discord.SelectOption(label="⭐ เลเวล +0", value="+0"),
-    discord.SelectOption(label="⭐ เลเวล +1", value="+1"),
-    discord.SelectOption(label="⭐ เลเวล +2", value="+2"),
-    discord.SelectOption(label="⭐ เลเวล +3", value="+3"),
-    discord.SelectOption(label="⭐ เลเวล +4", value="+4"),
-    discord.SelectOption(label="⭐ เลเวล +5", value="+5"),
+# 🟢 [แก้ไขจุดที่ 1] สร้างตัวเลือกเลเวลแยกเฉพาะแต่ละชนิดอาวุธ เพื่อให้แสดงชื่อและไอคอนหน้ากล่องชัดเจน
+KNIFE_OPTIONS = [
+    discord.SelectOption(label="❌ มีด : ไม่มีอาวุธ", value="-"),
+    discord.SelectOption(label="🔪 มีด : เลเวล +0", value="+0"),
+    discord.SelectOption(label="🔪 มีด : เลเวล +1", value="+1"),
+    discord.SelectOption(label="🔪 มีด : เลเวล +2", value="+2"),
+    discord.SelectOption(label="🔪 มีด : เลเวล +3", value="+3"),
+    discord.SelectOption(label="🔪 มีด : เลเวล +4", value="+4"),
+    discord.SelectOption(label="🔪 มีด : เลเวล +5", value="+5"),
 ]
 
+MACHETE_OPTIONS = [
+    discord.SelectOption(label="❌ มาเชเต้ : ไม่มีอาวุธ", value="-"),
+    discord.SelectOption(label="🗡️ มาเชเต้ : เลเวล +0", value="+0"),
+    discord.SelectOption(label="🗡️ มาเชเต้ : เลเวล +1", value="+1"),
+    discord.SelectOption(label="🗡️ มาเชเต้ : เลเวล +2", value="+2"),
+    discord.SelectOption(label="🗡️ มาเชเต้ : เลเวล +3", value="+3"),
+    discord.SelectOption(label="🗡️ มาเชเต้ : เลเวล +4", value="+4"),
+    discord.SelectOption(label="🗡️ มาเชเต้ : เลเวล +5", value="+5"),
+]
+
+POOL_OPTIONS = [
+    discord.SelectOption(label="❌ ไม้พูล : ไม่มีอาวุธ", value="-"),
+    discord.SelectOption(label="🦯 ไม้พูล : เลเวล +0", value="+0"),
+    discord.SelectOption(label="🦯 ไม้พูล : เลเวล +1", value="+1"),
+    discord.SelectOption(label="🦯 ไม้พูล : เลเวล +2", value="+2"),
+    discord.SelectOption(label="🦯 ไม้พูล : เลเวล +3", value="+3"),
+    discord.SelectOption(label="🦯 ไม้พูล : เลเวล +4", value="+4"),
+    discord.SelectOption(label="🦯 ไม้พูล : เลเวล +5", value="+5"),
+]
+
+GUN_OPTIONS = [
+    discord.SelectOption(label="❌ ปืน : ไม่มีอาวุธ", value="-"),
+    discord.SelectOption(label="🔫 ปืน : เลเวล +0", value="+0"),
+    discord.SelectOption(label="🔫 ปืน : เลเวล +1", value="+1"),
+    discord.SelectOption(label="🔫 ปืน : เลเวล +2", value="+2"),
+    discord.SelectOption(label="🔫 ปืน : เลเวล +3", value="+3"),
+    discord.SelectOption(label="🔫 ปืน : เลเวล +4", value="+4"),
+    discord.SelectOption(label="🔫 ปืน : เลเวล +5", value="+5"),
+]
+
+# --- 🟢 ส่วนที่ทำใหม่: หน้าต่างอัปเดตอาวุธ (Pre-load ข้อมูลเดิม + มีป้ายชื่อกำกับ) ---
 # --- 🟢 ส่วนที่ทำใหม่: หน้าต่างอัปเดตอาวุธ (Pre-load ข้อมูลเดิม + มีป้ายชื่อกำกับ) ---
 class WeaponUpdateView(discord.ui.View):
     def __init__(self, user_id: int, slot_info: dict):
@@ -237,10 +269,11 @@ class WeaponUpdateView(discord.ui.View):
         default_pool = slot_info.get("pool", "-")
         default_gun = slot_info.get("gun", "-")
         
-        self.knife_select = self.create_gear_select("🔪 อาวุธ: มีด", GEAR_OPTIONS, default_knife, row=0)
-        self.machete_select = self.create_gear_select("🗡️ อาวุธ: มาเชเต้", GEAR_OPTIONS, default_machete, row=1)
-        self.pool_select = self.create_gear_select("🦯 ไม้พูล", GEAR_OPTIONS, default_pool, row=2)
-        self.gun_select = self.create_gear_select("🔫 อาวุธ: ปืน", GEAR_OPTIONS, default_gun, row=3)
+        # 🟢 [แก้ไข] ส่งตัวเลือกเฉพาะของอาวุธแต่ละชนิดเข้า Select
+        self.knife_select = self.create_gear_select("🔪 เลือกเลเวลมีด...", KNIFE_OPTIONS, default_knife, row=0)
+        self.machete_select = self.create_gear_select("🗡️ เลือกเลเวลมาเชเต้...", MACHETE_OPTIONS, default_machete, row=1)
+        self.pool_select = self.create_gear_select("🦯 เลือกเลเวลไม้พูล...", POOL_OPTIONS, default_pool, row=2)
+        self.gun_select = self.create_gear_select("🔫 เลือกเลเวลปืน...", GUN_OPTIONS, default_gun, row=3)
         
         self.add_item(self.knife_select)
         self.add_item(self.machete_select)
@@ -257,6 +290,7 @@ class WeaponUpdateView(discord.ui.View):
 
     @discord.ui.button(label="✅ ยืนยันการอัปเดต", style=discord.ButtonStyle.success, row=4)
     async def confirm_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # 🟢 [แก้ไข] ย้าย defer ขึ้นมาบรรทัดแรกสุด ป้องกัน Timeout 3 วินาที
         await interaction.response.defer(ephemeral=True)
         gid = str(interaction.guild.id)
         weapons_data = load_weapons(gid)
@@ -282,7 +316,11 @@ class WeaponUpdateView(discord.ui.View):
         weapons_data[target_slot].update({"knife": knife_val, "machete": machete_val, "pool": pool_val, "gun": gun_val})
         save_weapons(gid, weapons_data)
         
-        await update_weapon_board(interaction.guild)
+        # 🟢 [แก้ไข] ครอบ try-except ล้อมการอัปเดตบอร์ด เพื่อความเสถียร
+        try:
+            await update_weapon_board(interaction.guild)
+        except Exception as e:
+            print(f"⚠️ Error updating weapon board: {e}")
         
         cfg = load_data(gid, "config", {})
         log_ch_id = cfg.get("weapon_log_ch")
@@ -372,6 +410,7 @@ class AdminAddSlotModal(discord.ui.Modal):
             await interaction.response.send_message("❌ กรุณากรอกหมายเลขสล็อตเป็นตัวเลขระหว่าง 1 ถึง 30 เท่านั้น!", ephemeral=True)
 
 # --- 🟢 ส่วนที่ทำใหม่: หน้าเพิ่มรายชื่อด้วย Modal ---
+# --- 🟢 ส่วนที่ทำใหม่: หน้าเพิ่มรายชื่อด้วย Modal ---
 class AdminAddMemberSlotView(discord.ui.View):
     def __init__(self, guild: discord.Guild):
         super().__init__(timeout=300)
@@ -414,15 +453,18 @@ class AdminAddMemberSlotView(discord.ui.View):
 
     @discord.ui.button(label="🟢 บันทึกเข้าสล็อต", style=discord.ButtonStyle.success, row=2)
     async def save_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # 🟢 [แก้ไขจุดที่ 1] ย้าย defer ขึ้นมาบรรทัดแรกสุด ตอบรับ Discord ทันที ป้องกัน Timeout 3 วินาที
+        await interaction.response.defer(ephemeral=True)
+
         if not self.selected_slot:
-            msg = await interaction.response.send_message("⚠️ **กรุณาระบุหมายเลขสล็อตก่อนครับ!**", ephemeral=True)
+            msg = await interaction.followup.send("⚠️ **กรุณาระบุหมายเลขสล็อตก่อนครับ!**", ephemeral=True)
             await asyncio.sleep(4)
             try: await msg.delete()
             except: pass
             return
 
         if not self.selected_user:
-            msg = await interaction.response.send_message("⚠️ **กรุณาเลือกสมาชิกที่ต้องการเพิ่มเข้าสล็อตก่อนครับ!**", ephemeral=True)
+            msg = await interaction.followup.send("⚠️ **กรุณาเลือกสมาชิกที่ต้องการเพิ่มเข้าสล็อตก่อนครับ!**", ephemeral=True)
             await asyncio.sleep(4)
             try: await msg.delete()
             except: pass
@@ -432,13 +474,21 @@ class AdminAddMemberSlotView(discord.ui.View):
         weapons_data = load_weapons(gid)
         target_member = self.selected_user
 
-        weapons_data[self.selected_slot] = {
+        # 🟢 [แก้ไขจุดที่ 2] แปลงเป็น Format ตัวเลข 2 หลัก (เช่น 05) เสมอ
+        slot_key = f"{int(self.selected_slot):02d}"
+
+        weapons_data[slot_key] = {
             "user_id": str(target_member.id),
             "name": target_member.display_name,
             "knife": "-", "machete": "-", "pool": "-", "gun": "-"
         }
         save_weapons(gid, weapons_data)
-        await update_weapon_board(interaction.guild)
+
+        # 🟢 [แก้ไขจุดที่ 3] ครอบ try-except ล้อมการอัปเดตบอร์ด ป้องกันปัญหาการประมวลผลค้าง
+        try:
+            await update_weapon_board(interaction.guild)
+        except Exception as e:
+            print(f"⚠️ Error updating board: {e}")
 
         cfg = load_data(gid, "config", {})
         log_ch_id = cfg.get("weapon_log_ch")
@@ -448,16 +498,15 @@ class AdminAddMemberSlotView(discord.ui.View):
                 if log_ch:
                     log_em = discord.Embed(title="📌 บันทึกการจัดการสล็อตอาวุธ (เพิ่มสมาชิก)", color=0xe67e22)
                     log_em.description = (f"**👮 ผู้ดำเนินการ:** {interaction.user.display_name} (Admin)\n"
-                                          f"**🔢 สล็อต:** {self.selected_slot}\n**👤 สมาชิก:** {target_member.display_name}\n\n{LONG_SEP}")
+                                          f"**🔢 สล็อต:** {slot_key}\n**👤 สมาชิก:** {target_member.display_name}\n\n{LONG_SEP}")
                     log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
                     await log_ch.send(embed=log_em)
             except: pass
 
-        await interaction.response.defer()
         try: await interaction.delete_original_response()
         except: pass
 
-        success_msg = await interaction.followup.send(f"🟢 **เพิ่มสมาชิก `{target_member.display_name}` เข้าสล็อตที่ {self.selected_slot} เรียบร้อยแล้ว!**", ephemeral=True)
+        success_msg = await interaction.followup.send(f"🟢 **เพิ่มสมาชิก `{target_member.display_name}` เข้าสล็อตที่ {slot_key} เรียบร้อยแล้ว!**", ephemeral=True)
         await asyncio.sleep(5)
         try: await success_msg.delete()
         except: pass
@@ -474,6 +523,7 @@ class AdminAddMemberSlotView(discord.ui.View):
         except: pass
 
 # --- 🟢 ส่วนที่ทำใหม่: หน้าลบรายชื่อ (ดึงเฉพาะสล็อตที่มีคนอยู่ + Full Wipe) ---
+# --- 🟢 ส่วนที่ทำใหม่: หน้าลบรายชื่อ (ดึงเฉพาะสล็อตที่มีคนอยู่ + Full Wipe) ---
 class AdminRemoveMemberSlotView(discord.ui.View):
     def __init__(self, guild: discord.Guild):
         super().__init__(timeout=300)
@@ -485,9 +535,11 @@ class AdminRemoveMemberSlotView(discord.ui.View):
         
         options = []
         for i in range(1, 31):
-            s_key = f"{i:02d}"  # เปลี่ยนจาก str(i) เป็น f"{i:02d}"
-            if s_key in weapons_data and weapons_data[s_key].get("user_id"):
-                raw_name = weapons_data[s_key].get("name", "Unknown")
+            s_key = f"{i:02d}"
+            s_key_alt = str(i)
+            slot_info = weapons_data.get(s_key) or weapons_data.get(s_key_alt)
+            if slot_info and slot_info.get("user_id"):
+                raw_name = slot_info.get("name", "Unknown")
                 clean_name = re.sub(r'^[\d\.\s]+', '', raw_name).strip()
                 if not clean_name: clean_name = raw_name
                 options.append(discord.SelectOption(label=f"สล็อตที่ {i:02d} : {clean_name}", value=s_key))
@@ -504,8 +556,11 @@ class AdminRemoveMemberSlotView(discord.ui.View):
 
     @discord.ui.button(label="🔴 ยืนยันลบออกจากสล็อต (Full Wipe)", style=discord.ButtonStyle.danger, row=1)
     async def remove_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # 🟢 [แก้ไขจุดที่ 1] ย้าย defer ขึ้นมาบรรทัดแรกสุด ตอบรับ Discord ทันที ป้องกัน Timeout 3 วินาที
+        await interaction.response.defer(ephemeral=True)
+
         if not self.selected_slot:
-            msg = await interaction.response.send_message("⚠️ **กรุณาเลือกหมายเลขสล็อตที่ต้องการลบก่อนครับ!**", ephemeral=True)
+            msg = await interaction.followup.send("⚠️ **กรุณาเลือกหมายเลขสล็อตที่ต้องการลบก่อนครับ!**", ephemeral=True)
             await asyncio.sleep(4)
             try: await msg.delete()
             except: pass
@@ -514,30 +569,43 @@ class AdminRemoveMemberSlotView(discord.ui.View):
         gid = str(interaction.guild.id)
         weapons_data = load_weapons(gid)
 
-        if self.selected_slot in weapons_data:
-            old_user_name = weapons_data[self.selected_slot].get("name", "Unknown")
-            weapons_data.pop(self.selected_slot) # --- 🟢 Full Wipe: ล้างข้อมูลเก่าเกลี้ยง ---
-            save_weapons(gid, weapons_data)
+        # 🟢 [แก้ไขจุดที่ 2] Full Wipe ล้างข้อมูลออกจากไฟล์ JSON ทั้งแบบมีศูนย์นำหน้าและไม่มีศูนย์ (ป้องกันชื่อค้างบนบอร์ด)
+        s_key_padded = f"{int(self.selected_slot):02d}"
+        s_key_raw = str(int(self.selected_slot))
+
+        old_user_name = "Unknown"
+        if s_key_padded in weapons_data:
+            old_user_name = weapons_data[s_key_padded].get("name", "Unknown")
+            weapons_data.pop(s_key_padded, None)
+        if s_key_raw in weapons_data:
+            old_user_name = weapons_data[s_key_raw].get("name", old_user_name)
+            weapons_data.pop(s_key_raw, None)
+
+        save_weapons(gid, weapons_data)
+
+        # 🟢 [แก้ไขจุดที่ 3] ครอบ try-except ล้อมการอัปเดตบอร์ด เพื่อความเสถียร
+        try:
             await update_weapon_board(interaction.guild)
+        except Exception as e:
+            print(f"⚠️ Error updating board: {e}")
 
-            cfg = load_data(gid, "config", {})
-            log_ch_id = cfg.get("weapon_log_ch")
-            if log_ch_id and log_ch_id != "disabled":
-                try:
-                    log_ch = bot.get_channel(int(log_ch_id))
-                    if log_ch:
-                        log_em = discord.Embed(title="📌 บันทึกการจัดการสล็อตอาวุธ (ลบสมาชิก/Full Wipe)", color=0xe74c3c)
-                        log_em.description = (f"**👮 ผู้ดำเนินการ:** {interaction.user.display_name} (Admin)\n"
-                                              f"**🔢 ลบสล็อตที่:** {self.selected_slot} (เดิมคือ: {old_user_name})\n\n{LONG_SEP}")
-                        log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
-                        await log_ch.send(embed=log_em)
-                except: pass
+        cfg = load_data(gid, "config", {})
+        log_ch_id = cfg.get("weapon_log_ch")
+        if log_ch_id and log_ch_id != "disabled":
+            try:
+                log_ch = bot.get_channel(int(log_ch_id))
+                if log_ch:
+                    log_em = discord.Embed(title="📌 บันทึกการจัดการสล็อตอาวุธ (ลบสมาชิก/Full Wipe)", color=0xe74c3c)
+                    log_em.description = (f"**👮 ผู้ดำเนินการ:** {interaction.user.display_name} (Admin)\n"
+                                          f"**🔢 ลบสล็อตที่:** {s_key_padded} (เดิมคือ: {old_user_name})\n\n{LONG_SEP}")
+                    log_em.set_footer(text=f"บันทึกเมื่อ: {get_thai_time().strftime('%d/%m/%Y %H:%M:%S')}")
+                    await log_ch.send(embed=log_em)
+            except: pass
 
-        await interaction.response.defer()
         try: await interaction.delete_original_response()
         except: pass
 
-        success_msg = await interaction.followup.send(f"🗑️ **ล้างข้อมูลสล็อตและประวัติอาวุธที่ {self.selected_slot} เรียบร้อยแล้ว (Full Wipe)!**", ephemeral=True)
+        success_msg = await interaction.followup.send(f"🗑️ **ล้างข้อมูลสล็อตและประวัติอาวุธที่ {s_key_padded} เรียบร้อยแล้ว (Full Wipe)!**", ephemeral=True)
         await asyncio.sleep(5)
         try: await success_msg.delete()
         except: pass
@@ -553,6 +621,7 @@ class AdminRemoveMemberSlotView(discord.ui.View):
         try: await interaction.delete_original_response()
         except: pass
 
+# --- 🟢 ส่วนที่ทำใหม่: ระบบตั้งค่าห้องด้วย Channel Select ---
 # --- 🟢 ส่วนที่ทำใหม่: ระบบตั้งค่าห้องด้วย Channel Select ---
 class WeaponSetupView(discord.ui.View):
     def __init__(self, guild: discord.Guild):
@@ -588,8 +657,11 @@ class WeaponSetupView(discord.ui.View):
 
     @discord.ui.button(label="🟢 บันทึกการตั้งค่า", style=discord.ButtonStyle.success, row=2)
     async def save_config_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # 🟢 [แก้ไขจุดที่ 1] ย้าย defer ขึ้นมาบรรทัดแรกสุด ตอบรับ Discord ทันที ป้องกัน Timeout 3 วินาที
+        await interaction.response.defer(ephemeral=True)
+
         if not self.board_ch_id:
-            msg = await interaction.response.send_message("⚠️ กรุณาเลือกห้องสำหรับแสดงบอร์ดอาวุธก่อนครับ!", ephemeral=True)
+            msg = await interaction.followup.send("⚠️ กรุณาเลือกห้องสำหรับแสดงบอร์ดอาวุธก่อนครับ!", ephemeral=True)
             await asyncio.sleep(5)
             try: await msg.delete()
             except: pass
@@ -601,13 +673,16 @@ class WeaponSetupView(discord.ui.View):
         cfg["weapon_log_ch"] = str(self.log_ch_id)
         save_data(gid, "config", cfg)
         
-        board_ch = interaction.guild.get_channel(int(self.board_ch_id))
-        if board_ch:
-            board_text = generate_weapon_board_content(interaction.guild)
-            code_block = f"```text\n{board_text}\n```"
-            await board_ch.send(content=code_block, view=WeaponBoardPersistentView())
-            
-        await interaction.response.defer()
+        # 🟢 [แก้ไขจุดที่ 2] ใส่ try-except ล้อมการส่งบอร์ด ป้องกันค้างเมื่อบอร์ดมีข้อความยาวมาก
+        try:
+            board_ch = interaction.guild.get_channel(int(self.board_ch_id))
+            if board_ch:
+                board_text = generate_weapon_board_content(interaction.guild)
+                code_block = f"```text\n{board_text}\n```"
+                await board_ch.send(content=code_block, view=WeaponBoardPersistentView())
+        except Exception as e:
+            print(f"⚠️ Error sending weapon board: {e}")
+
         try: await interaction.delete_original_response()
         except: pass
         
