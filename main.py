@@ -641,7 +641,7 @@ class AdminRemoveMemberSlotView(discord.ui.View):
         except: pass
 
 # --- 🟢 ส่วนที่ทำใหม่: ระบบตั้งค่าห้องด้วย Channel Select ---
-# --- 🟢 ส่วนที่ทำใหม่: ระบบตั้งค่าห้องด้วย Channel Select ---
+# --- 🟢 ส่วนตั้งค่าห้อง: ปรับแก้ให้ใช้ update_weapon_board ส่ง 2 ข้อความถูกต้อง ---
 class WeaponSetupView(discord.ui.View):
     def __init__(self, guild: discord.Guild):
         super().__init__(timeout=300)
@@ -676,7 +676,6 @@ class WeaponSetupView(discord.ui.View):
 
     @discord.ui.button(label="🟢 บันทึกการตั้งค่า", style=discord.ButtonStyle.success, row=2)
     async def save_config_btn(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # 🟢 [แก้ไขจุดที่ 1] ย้าย defer ขึ้นมาบรรทัดแรกสุด ตอบรับ Discord ทันที ป้องกัน Timeout 3 วินาที
         await interaction.response.defer(ephemeral=True)
 
         if not self.board_ch_id:
@@ -692,13 +691,9 @@ class WeaponSetupView(discord.ui.View):
         cfg["weapon_log_ch"] = str(self.log_ch_id)
         save_data(gid, "config", cfg)
         
-        # 🟢 [แก้ไขจุดที่ 2] ใส่ try-except ล้อมการส่งบอร์ด ป้องกันค้างเมื่อบอร์ดมีข้อความยาวมาก
+        # 🟢 [แก้ไข] เรียกใช้ update_weapon_board โดยตรง เพื่อแบ่งส่ง 2 ข้อความอัตโนมัติ
         try:
-            board_ch = interaction.guild.get_channel(int(self.board_ch_id))
-            if board_ch:
-                board_text = generate_weapon_board_content(interaction.guild)
-                code_block = f"```text\n{board_text}\n```"
-                await board_ch.send(content=code_block, view=WeaponBoardPersistentView())
+            await update_weapon_board(interaction.guild)
         except Exception as e:
             print(f"⚠️ Error sending weapon board: {e}")
 
