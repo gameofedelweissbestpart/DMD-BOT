@@ -109,6 +109,7 @@ def save_weapons(guild_id, data):
 # --- 📌 ของเดิม / ส่วนที่ปรับปรุง: ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ ---
 # --- 📌 แก้ไขฟังก์ชัน generate_weapon_board_content ---
 # 🟢 [แก้ไข] ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ (ปรับชื่อ 28 ตัวอักษร + ตัดหัวกล่องล่างออก)
+# 🟢 [แก้ไข] ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ (เอาเส้น │ หน้าคำว่า มีด ออก)
 def generate_weapon_board_content(guild):
     gid = str(guild.id)
     weapons_data = load_weapons(gid)
@@ -126,8 +127,8 @@ def generate_weapon_board_content(guild):
             name = re.sub(r'^[\d\.\s]+', '', raw_name).strip()
             if not name: name = raw_name
             
-            # 🟢 [แก้ไข] ปรับระยะชื่อเป็น 28 ตัวอักษร
-            name_display = name[:28].ljust(28)
+            # กำหนดระยะชื่อ 22 ตัวอักษร
+            name_display = name[:22].ljust(22)
             
             knife = slot_info.get("knife", "-")
             machete = slot_info.get("machete", "-")
@@ -137,26 +138,25 @@ def generate_weapon_board_content(guild):
             if gun in gun_counts:
                 gun_counts[gun] += 1
                 
-            line = f"{slot_num_str}. {name_display} │ มีด {knife:<2} │ มาเช {machete:<2} │ ไม้ {pool:<2} │ ปืน {gun:<2}"
+            # 🟢 [แก้ไข] เอา │ หน้าคำว่า มีด ออก (เว้นช่องว่างแทนให้แนวตรงกัน)
+            line = f"{slot_num_str}. {name_display}    มีด {knife:<2} │ มาเช {machete:<2} │ ไม้ {pool:<2} │ ปืน {gun:<2}"
         else:
             line = f"{slot_num_str}."
         slots_text_lines.append(line)
         
     now_str = get_thai_time().strftime("%d/%m/%Y เวลา %H:%M น.")
     
-    # 🟢 [แก้ไข] ข้อความกล่องบน (หัวบอร์ด + สรุปจำนวนปืน + สล็อต 01-15)
-    part1 = (
-        f"⚔️ บอร์ดอัปเดตอาวุธแก๊ง Dark Monday ⚔️\n\n"
+    # กล่องที่ 1 (กล่องบน): หัวบอร์ด + สล็อต 01-30
+    part1 = f"⚔️ บอร์ดอัปเดตอาวุธแก๊ง Dark Monday ⚔️\n\n"
+    part1 += "\n".join(slots_text_lines)
+    
+    # กล่องที่ 2 (กล่องล่าง): สรุปจำนวนปืน + เวลาอัปเดต
+    part2 = (
         f"📊 [ สรุปจำนวนปืนในแก๊ง ]\n"
         f"• ปืน +5: {gun_counts['+5']} คน  │  ปืน +4: {gun_counts['+4']} คน  │  ปืน +3: {gun_counts['+3']} คน\n"
-        f"• ปืน +2: {gun_counts['+2']} คน  │  ปืน +1: {gun_counts['+1']} คน  │  ปืน +0: {gun_counts['+0']} คน\n"
-        f"------------------------------------------------------------------------------------\n\n"
+        f"• ปืน +2: {gun_counts['+2']} คน  │  ปืน +1: {gun_counts['+1']} คน  │  ปืน +0: {gun_counts['+0']} คน\n\n"
+        f"Update {now_str}"
     )
-    part1 += "\n".join(slots_text_lines[:15])
-    
-    # 🟢 [แก้ไข] ข้อความกล่องล่าง (ไม่มีหัวข้อ ชิดขอบบน เริ่มที่สล็อต 16-30 + เวลาอัปเดต)
-    part2 = "\n".join(slots_text_lines[15:])
-    part2 += f"\n\nUpdate {now_str}"
     
     return part1, part2
 
