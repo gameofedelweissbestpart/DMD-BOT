@@ -107,7 +107,7 @@ def save_weapons(guild_id, data):
     save_data(guild_id, "weapons", data)
 
 # --- 📌 ของเดิม / ส่วนที่ปรับปรุง: ฟังก์ชันสร้างเนื้อหาบอร์ดอาวุธ ---
-# 📌 แก้ไขฟังก์ชัน generate_weapon_board_content (ช่วงบรรทัดที่ 62)
+# --- 📌 แก้ไขฟังก์ชัน generate_weapon_board_content ---
 def generate_weapon_board_content(guild):
     gid = str(guild.id)
     weapons_data = load_weapons(gid)
@@ -117,7 +117,7 @@ def generate_weapon_board_content(guild):
     
     for i in range(1, 31):
         slot_key = f"{i:02d}"
-        slot_num_str = f"{i:02d}"  # 🟢 [เพิ่มบรรทัดนี้] ประกาศตัวแปร slot_num_str ให้ทำงานได้
+        slot_num_str = f"{i:02d}"
         slot_info = weapons_data.get(slot_key)
         
         if slot_info and slot_info.get("user_id"):
@@ -125,7 +125,8 @@ def generate_weapon_board_content(guild):
             name = re.sub(r'^[\d\.\s]+', '', raw_name).strip()
             if not name: name = raw_name
             
-            name_display = name[:30].ljust(30)
+            # 🟢 [แก้ไข] ปรับระยะชื่อเป็น 22 ตัวอักษร เพื่อย่อขนาดข้อความรวมไม่ให้เกิน 2000 ตัวอักษร
+            name_display = name[:22].ljust(22)
             
             knife = slot_info.get("knife", "-")
             machete = slot_info.get("machete", "-")
@@ -144,7 +145,7 @@ def generate_weapon_board_content(guild):
     
     content = (
         f"⚔️ บอร์ดอัปเดตอาวุธแก๊ง Dark Monday ⚔️\n\n"
-        f"📊 [ สรุปจำนวนปืนในแก๊ง ]\n"
+        f"📊 สรุปจำนวนปืน\n"
         f"• ปืน +5: {gun_counts['+5']} คน  │  ปืน +4: {gun_counts['+4']} คน  │  ปืน +3: {gun_counts['+3']} คน\n"
         f"• ปืน +2: {gun_counts['+2']} คน  │  ปืน +1: {gun_counts['+1']} คน  │  ปืน +0: {gun_counts['+0']} คน\n"
         f"------------------------------------------------------------------------------------\n\n"
