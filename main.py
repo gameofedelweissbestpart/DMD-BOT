@@ -3304,6 +3304,9 @@ async def admin(ctx):
 
 # --- 9. ระบบ Backup (แก้ไขให้ส่งเฉพาะคนกด และแยกไฟล์ตาม Guild) ---
 # ใช้ @bot.slash_command สำหรับ Pycord โดยตรง ไม่ต้อง import app_commands
+# นำเข้า asyncio สำหรับใช้หน่วงเวลา (หากมีประกาศไว้ที่หัวไฟล์แล้ว สามารถข้ามบรรทัดนี้ได้ครับ)
+import asyncio
+
 @bot.slash_command(name="backup", description="สำรองข้อมูลและตั้งค่าเซิร์ฟเวอร์เฉพาะของคุณ")
 async def backup(ctx):
     try:
@@ -3327,11 +3330,17 @@ async def backup(ctx):
             file=discord.File(zip_filename)
         )
         
-        # ตอบกลับด้วยระบบ Ephemeral ของ Pycord (ข้อความลับ: เห็นคนเดียว)
+        # ส่งข้อความลับ (Ephemeral) แจ้งเตือนผู้ใช้
         await ctx.respond(
-            f"✅ ระบบได้ส่งไฟล์ Backup เฉพาะของเซิร์ฟเวอร์นี้เข้า DM ของคุณแล้วครับ (ข้อความนี้แสดงเฉพาะคุณ)",
+            f"✅ ระบบได้ส่งไฟล์ Backup เฉพาะของเซิร์ฟเวอร์นี้เข้า DM ของคุณแล้วครับ",
             ephemeral=True
         )
+        
+        # รอเวลา 6 วินาที
+        await asyncio.sleep(6)
+        
+        # สั่งลบข้อความลับออกอัตโนมัติ
+        await ctx.interaction.delete_original_response()
         
     except Exception as e:
         # กรณีเกิดข้อผิดพลาด แจ้งเตือนแบบลับเฉพาะคุณ
