@@ -3303,31 +3303,46 @@ async def admin(ctx):
 
 
 # --- 9. ระบบ Backup (แก้ไขให้ส่งเฉพาะคนกด และแยกไฟล์ตาม Guild) ---
-@bot.command()
-@commands.has_any_role("Admin", "ผู้ดูแล")
-async def backup(ctx):
+# นำเข้า app_commands สำหรับทำ Slash Command (หากในไฟล์มีการ import ไว้แล้ว ข้ามบรรทัดนี้ได้ครับ)
+from discord import app_commands
+
+# เปลี่ยนจาก @bot.command เป็น @bot.tree.command เพื่อรองรับเครื่องหมาย /
+@bot.tree.command(name="backup", description="สำรองข้อมูลและตั้งค่าเซิร์ฟเวอร์เฉพาะของคุณ")
+@app_commands.checks.has_any_role("Admin", "ผู้ดูแล")
+async def backup(interaction: discord.Interaction):
     try:
         import os
         import zipfile
         
-        guild_prefix = str(ctx.guild.id)
+        # ดึงรหัสเซิร์ฟเวอร์ปัจจุบัน
+        guild_prefix = str(interaction.guild.id)
         zip_filename = f"/app/{guild_prefix}_backup.zip"
         
-        # ค้นหาและแพ็กเฉพาะไฟล์ที่เป็นของเซิร์ฟเวอร์นี้ (Guild ID ขึ้นต้น)
+        # ค้นหาและแพ็กเฉพาะไฟล์ที่เป็นของเซิร์ฟเวอร์นี้เท่านั้น
         with zipfile.ZipFile(zip_filename, 'w') as zipf:
             for filename in os.listdir(DATA_DIR):
                 if filename.startswith(guild_prefix):
                     file_path = os.path.join(DATA_DIR, filename)
                     zipf.write(file_path, arcname=filename)
         
-        # ส่งไฟล์ zip เข้า DM ของคนที่พิมพ์คำสั่ง
-        await ctx.author.send(
-            f"📦 นี่คือไฟล์ Backup เฉพาะของเซิร์ฟเวอร์ **{ctx.guild.name}** ครับ:", 
+        # ส่งไฟล์ zip เข้าไปที่ DM (ข้อความส่วนตัว) ของผู้ใช้โดยตรง
+        await interaction.user.send(
+            f"📦 นี่คือไฟล์ Backup เฉพาะของเซิร์ฟเวอร์ **{interaction.guild.name}** ครับ:", 
             file=discord.File(zip_filename)
         )
-        await ctx.send(f"✅ ส่งไฟล์ Backup เฉพาะของเซิร์ฟเวอร์นี้เข้า DM ของท่าน (@{ctx.author.display_name}) เรียบร้อยแล้วครับ")
+        
+        # ตอบกลับด้วยระบบ Ephemeral (ข้อความลับ: เห็นคนเดียว คนอื่นในห้องแชทจะไม่เห็น)
+        await interaction.response.send_message(
+            f"✅ ระบบได้ส่งไฟล์ Backup เฉพาะของเซิร์ฟเวอร์นี้เข้า DM ของคุณแล้วครับ (ข้อความนี้แสดงเฉพาะคุณ)",
+            ephemeral=True
+        )
+        
     except Exception as e:
-        await ctx.send(f"❌ เกิดข้อผิดพลาดในการ Backup: {e}")
+        # กรณีเกิดข้อผิดพลาด ก็จะแจ้งเตือนแบบลับเฉพาะคุณเช่นกัน
+        await interaction.response.send_message(
+            f"❌ เกิดข้อผิดพลาดในการ Backup: {e}",
+            ephemeral=True
+        )
 
 # 🟢 เพิ่ม Slash Command /random สำหรับเปิดเมนูสุ่มได้โดยตรงทุกๆ คน
 # 🟢 แก้ไขให้ใช้ @bot.slash_command สำหรับ Pycord
