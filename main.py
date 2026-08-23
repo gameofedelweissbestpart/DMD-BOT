@@ -1961,15 +1961,6 @@ class CategorySelectionView(discord.ui.View):
         # 🟢 [แก้ไข] เปลี่ยนจาก edit_message เป็น send_message แบบ ephemeral=True
         await interaction.response.send_message(content="🛠 **ระบบแจ้งลา:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)), ephemeral=True)
 
-    @discord.ui.button(label="💰 ระบบแจ้งปรับเงิน", style=discord.ButtonStyle.primary, custom_id="setup_fine_system")
-    async def fine_system_setup(self, button: discord.ui.Button, interaction: discord.Interaction):
-        opts = [
-            discord.SelectOption(label="📋 แจ้งค่าปรับ Real-time", value="fine_realtime_ch"),
-            discord.SelectOption(label="📌 Log การปรับเงิน", value="fine_log_ch"),
-            discord.SelectOption(label="✅ อนุมัติการชำระเงิน", value="fine_approve_ch"),
-        ]
-        # 🟢 [แก้ไข] เปลี่ยนจาก edit_message เป็น send_message แบบ ephemeral=True
-        await interaction.response.send_message(content="🛠 **ระบบแจ้งปรับเงิน:** เลือกหัวข้อที่ต้องการตั้งค่า:", view=SubMenuView(interaction, AdminCatSelect(opts)), ephemeral=True)
 
     @discord.ui.button(label="ปิดเมนู", style=discord.ButtonStyle.danger, custom_id="admin_close_setup_category")
     async def close_menu(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -3316,17 +3307,25 @@ async def admin(ctx):
 @commands.has_any_role("Admin", "ผู้ดูแล")
 async def backup(ctx):
     try:
-        import shutil  # <-- เพิ่มบรรทัดนี้ไว้ข้างในเพื่อแก้ปัญหาทันที
+        import os
+        import zipfile
         
-        # บีบอัดไฟล์ทั้งหมดในโฟลเดอร์ DATA_DIR เป็น .zip
-        zip_path = shutil.make_archive('/app/data_backup', 'zip', DATA_DIR)
+        guild_prefix = str(ctx.guild.id)
+        zip_filename = f"/app/{guild_prefix}_backup.zip"
+        
+        # ค้นหาและแพ็กเฉพาะไฟล์ที่เป็นของเซิร์ฟเวอร์นี้ (Guild ID ขึ้นต้น)
+        with zipfile.ZipFile(zip_filename, 'w') as zipf:
+            for filename in os.listdir(DATA_DIR):
+                if filename.startswith(guild_prefix):
+                    file_path = os.path.join(DATA_DIR, filename)
+                    zipf.write(file_path, arcname=filename)
         
         # ส่งไฟล์ zip เข้า DM ของคนที่พิมพ์คำสั่ง
         await ctx.author.send(
-            f"📦 นี่คือไฟล์ Backup ข้อมูลและการตั้งค่าทั้งหมดของเซิร์ฟเวอร์ **{ctx.guild.name}** ครับ:", 
-            file=discord.File(zip_path)
+            f"📦 นี่คือไฟล์ Backup เฉพาะของเซิร์ฟเวอร์ **{ctx.guild.name}** ครับ:", 
+            file=discord.File(zip_filename)
         )
-        await ctx.send(f"✅ ส่งไฟล์ Backup ทั้งหมดเข้า DM ของท่าน (@{ctx.author.display_name}) เรียบร้อยแล้วครับ")
+        await ctx.send(f"✅ ส่งไฟล์ Backup เฉพาะของเซิร์ฟเวอร์นี้เข้า DM ของท่าน (@{ctx.author.display_name}) เรียบร้อยแล้วครับ")
     except Exception as e:
         await ctx.send(f"❌ เกิดข้อผิดพลาดในการ Backup: {e}")
 
