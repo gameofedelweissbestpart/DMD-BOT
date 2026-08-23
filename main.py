@@ -3315,24 +3315,18 @@ async def admin(ctx):
 @bot.command()
 @commands.has_any_role("Admin", "ผู้ดูแล")
 async def backup(ctx):
-    # แก้ไข Logic: ระบุ Path ไฟล์ของเซิร์ฟเวอร์ปัจจุบัน
-    gid = str(ctx.guild.id)
-    path_leaves = get_path(gid, "leaves")
-    path_config = get_path(gid, "config")
-    
-    # แก้ไข Logic: ส่ง DM เฉพาะหา ctx.author (คนพิมพ์คำสั่ง) เท่านั้น
     try:
-        f_send = []
-        if os.path.exists(path_leaves): f_send.append(discord.File(path_leaves))
-        if os.path.exists(path_config): f_send.append(discord.File(path_config))
+        # บีบอัดไฟล์ทั้งหมดในโฟลเดอร์ DATA_DIR เป็น .zip
+        zip_path = shutil.make_archive('/app/data_backup', 'zip', DATA_DIR)
         
-        if not f_send:
-            return await ctx.send("❌ **ไม่พบไฟล์ข้อมูลในเซิร์ฟเวอร์นี้เพื่อทำ Backup**")
-            
-        await ctx.author.send(f"📦 นี่คือไฟล์ Backup ข้อมูลและการตั้งค่าของเซิร์ฟเวอร์ **{ctx.guild.name}** ครับ:", files=f_send)
-        await ctx.send(f"✅ ส่งไฟล์ Backup เข้า DM ของท่าน (@{ctx.author.display_name}) เรียบร้อยแล้ว")
-    except discord.Forbidden:
-        await ctx.send("❌ **ไม่สามารถส่งไฟล์ได้!** โปรดเปิดการรับข้อความจาก DM (Private Message) ก่อนครับ")
+        # ส่งไฟล์ zip เข้า DM ของคนที่พิมพ์คำสั่ง
+        await ctx.author.send(
+            f"📦 นี่คือไฟล์ Backup ข้อมูลและการตั้งค่าทั้งหมดของเซิร์ฟเวอร์ **{ctx.guild.name}** ครับ:", 
+            file=discord.File(zip_path)
+        )
+        await ctx.send(f"✅ ส่งไฟล์ Backup ทั้งหมดเข้า DM ของท่าน (@{ctx.author.display_name}) เรียบร้อยแล้วครับ")
+    except Exception as e:
+        await ctx.send(f"❌ เกิดข้อผิดพลาดในการ Backup: {e}")
 
 # 🟢 เพิ่ม Slash Command /random สำหรับเปิดเมนูสุ่มได้โดยตรงทุกๆ คน
 # 🟢 แก้ไขให้ใช้ @bot.slash_command สำหรับ Pycord
