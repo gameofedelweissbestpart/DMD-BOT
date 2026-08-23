@@ -3316,6 +3316,8 @@ async def admin(ctx):
 @commands.has_any_role("Admin", "ผู้ดูแล")
 async def backup(ctx):
     try:
+        import shutil  # <-- เพิ่มบรรทัดนี้ไว้ข้างในเพื่อแก้ปัญหาทันที
+        
         # บีบอัดไฟล์ทั้งหมดในโฟลเดอร์ DATA_DIR เป็น .zip
         zip_path = shutil.make_archive('/app/data_backup', 'zip', DATA_DIR)
         
